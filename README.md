@@ -346,7 +346,9 @@ The prose describes a richer machine than the executor yet runs — normal pre-f
 but stated plainly so the "deterministic shell" claim stays honest. The Claude Code executor
 (`executors/mission-executor.workflow.js`) currently implements: the wave-based DAG walk,
 fan-out, close-time binding (V0/V1 self-closure requires a recorded passing check, else
-auto-downgrade to a critic), the micro-loop retry, and one actor→critic→adjudicate pass.
+auto-downgrade to a critic), the micro-loop retry, one actor→critic→adjudicate pass, and the
+token-frugal slice of **cold-reviewer rotation** (§3.4) — one cold reviewer fires only to
+double-check a *clean* verdict on the final deliverable, with free deterministic detection.
 
 **Specified but not yet in the executor — Phase 1 work:**
 - **Subtree replan** (the ladder's top rung) — currently the node is marked done-with-defect
@@ -355,6 +357,9 @@ auto-downgrade to a critic), the micro-loop retry, and one actor→critic→adju
   the code runs actor→critic once and returns `blocked` without the rebuttal cycle.
 - **Audit → punchlist → fix loop** — AUDIT assembles the punchlist but does not yet re-enter
   EXECUTE to work it.
+- **Full cold-reviewer rotation (§3.4)** — the mid-debate convergence-detect-and-reseed across
+  plan-fight rounds; only the clean-confirm slice on the final deliverable is wired so far (the
+  multi-round version pairs with the rebuttal and audit-fix loops above).
 
 None of this is run-tested (no mission has executed). The Codex adapter is a spec, not an
 implementation. Treat the system as a designed protocol with a partial reference executor, not

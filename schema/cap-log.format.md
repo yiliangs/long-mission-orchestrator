@@ -16,7 +16,7 @@ One JSON object per line:
 | `run_id` | the mission |
 | `constitution_version` | governing version — never aggregate across versions |
 | `node` | node id |
-| `cap` | which cap: `micro_loop_retries` \| `sub_loop_iterations` \| `subtree_replans` \| `plan_fight_rounds` \| `audit_cycles` |
+| `cap` | which cap: `micro_loop_retries` \| `sub_loop_iterations` \| `subtree_replans` \| `plan_fight_rounds` \| `audit_cycles` \| `cold_swaps` |
 | `limit` | the cap value in force |
 | `used` | iterations actually consumed |
 | `outcome` | `converged` (finished at/under limit) \| `cap-hit` (stopped by the cap) |

@@ -37,6 +37,7 @@ const DEFAULT_CAPS = {
   micro_loop_retries: 3,
   sub_loop_iterations: 5,
   subtree_replans: 2,
+  cold_swaps: 1,            // §3.4 cold-reviewer rotation; evolution-tuned
 }
 
 // ── Structured-output schemas ────────────────────────────────────────────────
@@ -143,6 +144,26 @@ if it cites a specific named acceptance criterion or constitution clause in cite
 "major", not "blocker".`
 }
 
+// Cold reviewer (§3.4): fresh eyes on an artifact that tentatively PASSED, blind to the
+// prior review. Both staleness-breaker and disambiguator of genuine-vs-stale convergence.
+function coldCriticPrompt(node, artifact) {
+  return `${govern}
+
+You are a COLD reviewer. This artifact has tentatively PASSED review — your job is to find
+what a reviewer who had stared at it for several rounds would have stopped noticing. You have
+NO knowledge of the prior review (no verdicts, no debate); judge it FRESH against the
+objective criteria only, defaulting to REJECT under uncertainty.
+
+TASK NODE [${node.id}] ${node.title}
+ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
+ARTIFACT UNDER REVIEW:
+${artifact}
+
+Return findings ({severity, claim, evidence}; a "blocker" needs a cited named criterion in
+cited_criterion or it is discarded). If the artifact is genuinely sound, return an EMPTY
+findings list — do NOT manufacture issues to seem useful.`
+}
+
 // ── Adjudication (orchestrator rules; §3.3) ──────────────────────────────────
 // Returns { blockers, majors, minors } after discarding invalid findings.
 function adjudicate(findingSets) {
@@ -209,9 +230,29 @@ async function runNode(node) {
       { label: `critic:${node.id}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA })))
 
   const verdict = adjudicate(findingSets)
+
+  // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
+  // model call). Fire ONE cold reviewer only to double-check a *clean* verdict on the final
+  // deliverable: a stale green is the only dangerous case, so a review that already found
+  // issues gets no cold pass, and routine nodes get none ever. Net cost ≤1 critic call/mission.
+  let coldConfirmed = false
+  const candidateClean = verdict.blockers.length === 0 && verdict.majors.length === 0
+  if (node.is_final_deliverable && candidateClean && capFor(node, 'cold_swaps') > 0) {
+    const cold = await agent(coldCriticPrompt(node, actor.artifact_summary),
+      { label: `critic:${node.id}:cold`, phase: 'Execute', schema: CRITIC_SCHEMA })
+    coldConfirmed = true
+    if (cold) {
+      const c = adjudicate([cold])              // new findings ⇒ the green was stale
+      verdict.blockers.push(...c.blockers)
+      verdict.majors.push(...c.majors)
+      verdict.minors.push(...c.minors)
+    }
+  }
+
   return {
     node: node.id, status: actor.outcome, actor,
     closed_by: 'critic', critic: verdict,
+    cold_confirmed: coldConfirmed,
     blocked: verdict.blockers.length > 0,
   }
 }

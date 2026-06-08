@@ -48,7 +48,7 @@
             "required": ["node", "cap", "limit", "used"],
             "properties": {
               "node": { "type": "string" },
-              "cap": { "enum": ["micro_loop_retries", "sub_loop_iterations", "subtree_replans", "plan_fight_rounds", "audit_cycles"] },
+              "cap": { "enum": ["micro_loop_retries", "sub_loop_iterations", "subtree_replans", "plan_fight_rounds", "audit_cycles", "cold_swaps"] },
               "limit": { "type": "integer" },
               "used": { "type": "integer" },
               "would_have_converged": {

@@ -143,6 +143,34 @@ whether a-c is warranted. **Discretion above the floor; never below it.**
   itself evidence for amendment (tighter critic prompts, sharper criteria). A safety
   channel that cries wolf is worse than none.
 
+### 3.4 Cold-reviewer rotation (a quiet review is ambiguous — confirm it cold)
+
+Multi-round review has a known failure (and an empirical one — disagreement rate decays with
+rounds, correlated with quality drop): as rounds proceed the critic accommodates the
+accumulating thread, a *stale* convergence that looks identical to *genuine* convergence
+(artifact actually clean). Triangulated adjudication (§3.3) kills actor↔critic accommodation;
+it does **not** kill critic-over-rounds staleness. Cold-reviewer rotation does.
+
+- **Free, deterministic detection.** The orchestrator counts *new distinct findings* per round
+  (deduped in code — **no model call**). Zero new findings, or a critic about to declare an
+  artifact clean, is a *candidate-terminal* state.
+- **Confirm it cold.** At a candidate-terminal, spawn a fresh reviewer seeded with **objective
+  context only** — the artifact, the named acceptance criteria, and machine-check results — and
+  **blind to the prior review** (no verdicts, rebuttals, or debate narrative). It is both the
+  staleness-breaker and the disambiguator: new real findings ⇒ the convergence was stale
+  (reactivate, continue); nothing ⇒ genuinely converged (trust the green).
+- **Bounded.** ≤1 cold swap by default; refute-framed cold reviewers default to reject, so
+  uncapped rotation would thrash. Citation-gating (§3.3) filters their noise, and the cold
+  reviewer is told not to manufacture issues to seem useful.
+
+**Token discipline (this must not burn the budget):** detection is free (deterministic, no
+LLM); a cold reviewer fires **only at a candidate-terminal**, never per round, and in the
+reference executor **only to double-check a *clean* verdict on a high-stakes node** — a stale
+green is the dangerous case; a review that already found issues needs no confirmation.
+Reserved to the **plan-fight and the final deliverable**, never routine nodes; net cost is at
+most one extra critic call per mission. Its thresholds are **evolution-tuned caps** (§6.2, §7):
+design adds the nerve, data tunes its sensitivity.
+
 ---
 
 ## 4. Interaction modes
@@ -256,6 +284,7 @@ plan.json with a reason string.
 | Plan-fight rounds | 3 |
 | Audit → punchlist → fix cycles | 2, then defect ledger |
 | Critic per a-c task | 1 critic default; 3-lens panel for final deliverable + plan-fight |
+| Cold-reviewer swaps (§3.4) | 1, fired only at a candidate-clean terminal on high-stakes nodes |
 
 ### 6.3 Finalization (not a deadline)
 
