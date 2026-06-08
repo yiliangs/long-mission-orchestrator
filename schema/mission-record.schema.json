@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-mission-orchestrator/long-mission-orchestrator/mission-record.schema.json",
+  "title": "Mission run-record",
+  "description": "Curated, schema-validated record of one mission, WRITTEN by the orchestrator (never synthesized by a second model — constitution §7). Lands in claude-fieldnotes/mission_records/<run-id>.json. The evolution loop reads these; a record is the only valid evidence for an amendment proposal.",
+  "type": "object",
+  "required": [
+    "schema_version", "run_id", "goal", "repo", "mode",
+    "constitution_version", "outcome", "nodes_executed", "human_review"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "run_id": { "type": "string" },
+    "goal": { "type": "string" },
+    "repo": { "type": "string" },
+    "mode": { "enum": ["attended", "unattended-live", "queued"] },
+    "constitution_version": {
+      "type": "string",
+      "description": "Governing version. REQUIRED — the evolution loop must not compare records across regimes (§7)."
+    },
+    "started_at": { "type": ["string", "null"] },
+    "delivered_at": { "type": ["string", "null"] },
+    "outcome": { "enum": ["DELIVERED", "DIVERGED"] },
+
+    "plan_vs_executed": {
+      "type": "object",
+      "description": "How reality diverged from the frozen plan — the raw material for cap/rule calibration.",
+      "additionalProperties": false,
+      "properties": {
+        "planned_node_count": { "type": "integer" },
+        "executed_node_count": { "type": "integer" },
+        "replans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "cap_hits": {
+          "type": "array",
+          "description": "Every node that hit a cap. The audit's later judgment (would_have_converged) is the calibration signal.",
+          "items": {
+            "type": "object",
+            "required": ["node", "cap", "limit", "used"],
+            "properties": {
+              "node": { "type": "string" },
+              "cap": { "enum": ["micro_loop_retries", "sub_loop_iterations", "subtree_replans", "plan_fight_rounds", "audit_cycles"] },
+              "limit": { "type": "integer" },
+              "used": { "type": "integer" },
+              "would_have_converged": {
+                "type": ["boolean", "null"],
+                "description": "Audit judgment: was the cap-hit effort-shaped (true → raise candidate) or structural (false → cap was right)?"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "critic_activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ac_nodes": { "type": "integer" },
+        "blockers_raised": { "type": "integer" },
+        "blockers_escalated_to_human": { "type": "integer" },
+        "majors_accepted_with_reason": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": { "type": "string" },
+              "finding": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "defect_ledger": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known shortfalls in the delivered artifact (§5)."
+    },
+
+    "human_review": {
+      "type": "object",
+      "description": "Filled by /mission-accept when the Human reviews. THE GOLD SIGNAL (§7): the diff between delivered and accepted is ground truth for where the framework misjudged.",
+      "additionalProperties": false,
+      "required": ["reviewed"],
+      "properties": {
+        "reviewed": { "type": "boolean" },
+        "human_diff_stat": {
+          "type": ["string", "null"],
+          "description": "git diff --stat between delivered tree and accepted (post-edit) tree. Large diff on a node the framework self-closed = a verification gap."
+        },
+        "human_diff_summary": {
+          "type": ["string", "null"],
+          "description": "Short human/orchestrator note on WHAT changed and why — the categorized lesson."
+        },
+        "blocker_verdicts": {
+          "type": "array",
+          "description": "Escalation-precision telemetry: was each human-escalated blocker legit or noise? A falling legit-rate is evidence for tightening critic prompts (§3.3).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": { "type": "string" },
+              "verdict": { "enum": ["legit", "noise"] }
+            }
+          }
+        },
+        "accepted": {
+          "type": ["boolean", "null"],
+          "description": "Did the Human merge the agent branch (with or without edits)?"
+        }
+      }
+    }
+  }
+}

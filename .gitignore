@@ -1,0 +1,8 @@
+# Real machine profiles are local-only; only the .example is tracked.
+machine-profile.md
+docs/machine-profile.md
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.stackdump
