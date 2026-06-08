@@ -80,6 +80,28 @@ out for free:
 - proposals without cited records are **invalid findings** — same rule as everywhere;
 - the deliverable is reviewed and merged by **you** — self-modification cannot self-approve.
 
+## The corpus is the asset (and two honest corrections)
+
+1. **The human-diff is a latent test suite, not just governance fuel.** The diff between
+   delivered and accepted is the V2 oracle the framework keeps admitting it lacks — expressed
+   as ground truth about *your* standards. Its highest use is **not** tuning the cap table; it
+   is mining recurring edits into concrete **acceptance criteria and critic prompts**. So
+   Tier-3's first job is *verifier construction from diffs* — turning "what you always fix"
+   into checks the next mission applies before delivery. Cap-tuning (Tier-2) is the side dish.
+   The accumulating corpus, not the constitution, is the irreplaceable asset (constitution
+   §10).
+
+2. **Statistical calibration is a scale claim, not a day-1 claim.** At N≈10–30 missions over
+   months, "evidence, not vibes" is aspirational: few, noisy samples. Worse, the
+   version-purity guardrail (never compare across constitution versions) means every amendment
+   resets the comparable corpus toward zero — you cannot amend often *and* keep a large
+   same-version sample. Honest resolution: (a) split **comparability-breaking** amendments
+   (which reset the corpus) from **non-breaking** ones (clarifications, new fields — which do
+   not), and reset only on the former; (b) early on, Tier-2/3 are a **qualitative human read**
+   of individual records, not statistics — the statistical framing earns its keep only once
+   same-version N is large. Until then the loop is disciplined reading of the corpus, and that
+   is fine. Say so rather than dressing N≈10 as significance.
+
 ## Guardrails (because self-modifying systems have known pathologies)
 
 1. **Batch** — one amendment batch per cycle. Constant churn destroys the run-to-run

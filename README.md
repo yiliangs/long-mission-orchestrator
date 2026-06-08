@@ -40,6 +40,13 @@ decides when it's actually finished.
 > **Status:** v0.1, pre-first-mission. Design settled in a long grilling session; this repo
 > is the canonical home. Operative files deploy into `~/.claude` (see [Deploy](#deploy)).
 
+> **Honest scope.** Autonomy is strongest where verification is cheap (does it compile, do the
+> tests pass, does the citation resolve) and on *drafting* (generate-and-rank). It is weakest
+> exactly where research value lives — is the argument sound, the experiment right — because
+> that is model-judged or human-only. A model critiquing a model is a *correlated* checker, not
+> an independent one. Read the pitch as **an overnight drafting-and-mechanical-checking engine
+> with a human gate**, not an autonomous researcher.
+
 ---
 
 ## The five ideas it's built on
@@ -177,6 +184,10 @@ flowchart LR
     WF --> ART["same result"]
     CX --> ART
 ```
+
+*One adapter is proven (Claude Code); the Codex path is specified but **untested**. You don't
+know a spec is harness-neutral until a second consumer runs it and reveals the leaked
+assumptions — so treat "same result" as a design intent, not a demonstrated fact.*
 
 ---
 
@@ -328,6 +339,26 @@ into `~/.claude/commands/`, and the Workflow executor into `~/.claude/workflows/
 `/mission`, a new machine auto-drafts its gitignored, local `machine-profile.md`.
 
 ---
+
+## Implementation status (v0.1)
+
+The prose describes a richer machine than the executor yet runs — normal pre-first-mission,
+but stated plainly so the "deterministic shell" claim stays honest. The Claude Code executor
+(`executors/mission-executor.workflow.js`) currently implements: the wave-based DAG walk,
+fan-out, close-time binding (V0/V1 self-closure requires a recorded passing check, else
+auto-downgrade to a critic), the micro-loop retry, and one actor→critic→adjudicate pass.
+
+**Specified but not yet in the executor — Phase 1 work:**
+- **Subtree replan** (the ladder's top rung) — currently the node is marked done-with-defect
+  and the walk continues; it does not yet redraw the branch.
+- **In-node rebuttal round** — §3.3 grants the actor one evidence-based rebuttal per finding;
+  the code runs actor→critic once and returns `blocked` without the rebuttal cycle.
+- **Audit → punchlist → fix loop** — AUDIT assembles the punchlist but does not yet re-enter
+  EXECUTE to work it.
+
+None of this is run-tested (no mission has executed). The Codex adapter is a spec, not an
+implementation. Treat the system as a designed protocol with a partial reference executor, not
+a finished engine.
 
 ## Status and roadmap
 

@@ -50,9 +50,24 @@ after the goal. Concentrate all ambiguity there; after it, the mission runs auto
 ### 1. GRILL
 Interactive conversation with the human (attended / launched-live: live; queued/remote:
 criticality-split per §4). Propose an approach, surface your assumptions, ask the questions
-that matter, and resolve every branch that would otherwise become a 2am guess. The grilled,
-agreed understanding is the input to PLAN — this is the last point a human is in the loop
-before autonomous flight.
+that matter, and resolve every branch that would otherwise become a 2am guess. This is the
+last point a human is in the loop before autonomous flight, so the whole mission's quality is
+bottlenecked here — it is load-bearing, and it gets a contract, not a vibe.
+
+**The grill must output a brief** (the input to PLAN) that pins down:
+- **Scope** — what is in, what is explicitly out.
+- **Definition of done** — the success condition, in the human's words.
+- **Named acceptance criteria** — concrete, citable conditions (these become the nodes'
+  `acceptance_criteria` and the only things a blocker may cite, §3.3).
+- **Resolved assumptions** — every branch you would otherwise guess at, with the human's call
+  recorded.
+- **Standards to learn** — if a fieldnotes human-diff corpus exists for this repo, pull the
+  recurring acceptance criteria and critic prompts mined from it (evolution §"corpus") and
+  confirm them here, so the grill front-loads what the human has historically changed.
+
+Before freezing, **a critic checks the brief itself**: does it actually pin down "done," or
+will PLAN have to guess? An under-specified brief is sent back to the grill, not forward to
+PLAN — a vague grill is the cheapest place to fail and the most expensive place to skip.
 
 ### 2. PLAN
 Draft a DAG conforming to `~/.claude/docs/mission-plan.schema.json`. For each node assign:

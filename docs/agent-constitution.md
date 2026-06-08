@@ -82,6 +82,19 @@ that run become suspect and are flagged in the report.
 - The plan-fight (§6) includes a **verification-adequacy lens** whose sole job is to attack
   the V-class column for obvious under-classification.
 
+### 2.3 The V2 honesty clause (verifier correlation)
+
+V0/V1 verification is genuinely *outside* the model — a compiler, a test, a resolver. **V2 is
+not.** The critic is a fresh instance of the same model family as the actor, so it is
+**correlated, not independent**. Fresh-context / artifact-only / refute-framing reduce
+anchoring; they do **not** buy statistical independence. A failure mode shared across the
+model family passes the V2 gate looking green. Consequences — load-bearing elsewhere, stated
+plainly here: V2 never self-closes; the final deliverable is human-merged (§9.2); the
+highest-judgment work is V3; and the report must **label evidence class** so a human never
+mistakes model-judged for machine-proven (§12). **V2 is judgment made legible, not
+verification.** Treat its green checks accordingly — strongest where work is mechanical
+(V0/V1), weakest exactly where the value of research lives.
+
 ---
 
 ## 3. Actor–critic
@@ -256,6 +269,16 @@ distinguishes:
 
 A mission is killed on **divergence**, never on the clock.
 
+### 6.4 Cost
+
+Verification is where the budget goes — parallel actors each shadowed by a critic, 3-lens
+panels on the final deliverable, audit re-running checks, and `/evolve` being itself a
+mission. The economics lever is **adaptive depth = the V-ladder**: V0/V1 verify for near-zero
+(one check command), single-critic is the V2 default, and 3-lens panels are reserved for the
+final deliverable and the plan-fight. Spend verification where the oracle is weak, not
+uniformly. A run that cannot afford its own verification narrows scope — it does **not** skip
+the gate.
+
 ---
 
 ## 7. The three nested loops (self-evolution)
@@ -338,8 +361,12 @@ a proposal touching them is flagged `PERIMETER` and waits for the Human directly
 ## 10. Substrate neutrality (forked for Codex)
 
 The **specification** (this constitution, the repo contract, the `plan.json` schema) is
-harness-neutral and is the irreplaceable IP. The **executor** is a swappable runtime
-binding.
+harness-neutral and is the portable **skeleton** — a synthesis of ideas largely already in
+the field (actor-critic, plan-as-data, gated self-modification), so it is replaceable in
+principle and is not the moat. The genuinely **irreplaceable, compounding asset is the
+human-diff corpus** in fieldnotes (§7): the record of what *this human specifically* accepts
+versus what was delivered. The spec travels; the corpus cannot be copied. The **executor** is
+a swappable runtime binding.
 
 - **plan.json is the contract between brain and hands.** A plan is pure data; any executor
   can walk it. A mission planned by one harness on one machine can, in principle, be
@@ -387,6 +414,13 @@ Four unambiguous morning signals, so silence is never confused with progress:
   (phone-readable) → *Needs you* (one-tap verdicts, which double as escalation-precision
   telemetry) → *Accepted-with-reason* → *Done*. A `report.json` twin accompanies it for the
   evolution loop.
+- **Evidence-class legibility (non-negotiable).** Every closed item is tagged with *how* it
+  was closed: **`[machine]`** (V0/V1 — a recorded passing check), **`[model]`** (V2 — a critic
+  verdict), or **`[human]`** (V3). A machine-proven green and a model-opined green must never
+  render identically; the four-signal summary is honest only if per-item evidence class is
+  visible. This is the report's primary job — it carries the V0–V3 distinction (§2, §2.3) all
+  the way to the tired human at 7am, so trust calibrates to the actual evidence, not to the
+  uniform look of a checkmark.
 - Reports + records flow to **fieldnotes** (telemetry); this constitution + contracts +
   skills live in **claude-config** (governance). Don't mix the two.
 
