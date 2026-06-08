@@ -209,6 +209,82 @@ flowchart TB
 
 ---
 
+## Design sparks
+
+The ideas this project is proud of — concepts that crystallized while designing it. Some are
+original, some are sharp recombinations; all are load-bearing.
+
+### Trust & verification
+- **Four-level verification ladder (V0–V3).** Every task carries a check-level that decides
+  *who is permitted to close it* — self-testable, machine-checkable, judge-checkable,
+  human-only. A permission system for the word "done."
+- **Close-time binding.** A self-checkable task cannot close without an actually-run, recorded,
+  passing check; no proof on record → automatic downgrade to a critic. Self-report never closes
+  work. (Arrived at by *ablating* plan-time check-naming: bind the check at the moment of
+  maximum information, not up front.)
+- **The verifier is the whole game.** Autonomy is bounded by how cheaply "done" is checkable —
+  treated as a hard design constraint, not an afterthought.
+
+### Adversarial review without sycophancy
+- **Triangulated adjudication.** Actor and critic never talk directly; each speaks only to an
+  orchestrator that rules. Direct dialogue is the channel sycophancy travels — so remove it.
+  The actor gets exactly one rebuttal per finding; the fight ends by ruling, never by consensus.
+- **Citation-gated blockers.** A "blocker" is valid only if it cites a named rule or criterion;
+  uncited → demoted to "major." Keeps the critic's strongest word narrow and kills manufactured
+  severity.
+- **Asymmetric rounding.** Verification class rounds *up* under uncertainty (protect
+  correctness); severity rounds *down* to "major" (protect the human's attention). Opposite
+  defaults, because they guard different scarce resources.
+
+### Where the human stands
+- **The grill, up front.** The one human-in-the-loop conversation sits right after the goal:
+  resolve every branch while you are present, then walk away. *Attended launch, autonomous
+  flight.*
+- **Four morning signals.** A run reports exactly one of DELIVERED / DIVERGED / IN-FLIGHT(ETA) /
+  silence — and silence means *dead*, so a late run is never mistaken for a crash.
+- **Escalation precision is measured.** Every escalated blocker gets a one-tap legit/noise
+  verdict; a falling legit-rate is evidence to tighten the critics. A safety channel that cries
+  wolf is worse than none.
+
+### Autonomy that degrades gracefully
+- **No-stall + defect ledger.** A run never blocks waiting on a human; it ships the best
+  artifact within limits and *confesses every shortfall in writing*. "Write down every defect"
+  pressures the worker to fix; "lousy is acceptable" would invite sloth — same outcome, opposite
+  psychology.
+- **The problem-solving ladder.** A stuck step climbs one rung at a time — retry, then
+  fresh-context loop, then replan-the-branch — never skipping. Don't replan what a retry fixes;
+  don't retry what only a replan can fix.
+- **Finalize on divergence, not on a clock.** A run is killed when progress stops shrinking, not
+  at a deadline. A late plane still lands; only a circling one is brought down.
+
+### Self-improvement, safely
+- **Three nested loops.** Missions do the work, calibration tunes the numbers, evolution amends
+  the rules — each slower, each gated by the human.
+- **The human-diff is the gold signal.** What you change before accepting a result is the only
+  honest measure of where the system was wrong; everything else is the system grading its own
+  homework.
+- **Generate ≠ apply.** Drafting a self-amendment is automated and safe; *applying* one always
+  waits for your grant. A system that emails its own proposed rule-change is doing homework; one
+  that applies it un-granted is the failure mode the perimeter exists to prevent.
+- **Caps are iterated, not asserted.** The retry/loop/replan limits start as guesses and
+  self-calibrate from a log of where they actually bind — but the human approves every change.
+- **The perimeter.** A self-modifying system with a fixed spine: agents may *propose* changes to
+  blast-radius, merge authority, and the verification floors, but never apply them. The
+  constitution evolves; its core cannot self-edit.
+
+### Portable & durable
+- **plan.json is the brain↔hands contract.** The plan is pure data with no tool-specific tricks,
+  so the same mission can be planned by one AI tool and executed by another.
+- **Roles, not hostnames.** Synced rules speak in roles (light / heavy); each machine binds them
+  to its real hardware locally. Add a machine, write one profile, change nothing else.
+- **The orchestrator-armed heartbeat.** A mission survives token-limits, crashes, and reboots
+  through one idempotent contingency that resumes from disk — no clock arithmetic, and not a
+  user-facing feature.
+- **Three-way separation.** Governance (the rules), telemetry (the memory), and working-state
+  (the actual work) live in three separate places and never mix.
+
+---
+
 ## Repository layout
 
 ```
