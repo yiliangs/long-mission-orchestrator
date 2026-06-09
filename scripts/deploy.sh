@@ -8,10 +8,11 @@ set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 claude="${HOME}/.claude"
 
-mkdir -p "$claude/docs" "$claude/commands" "$claude/workflows"
+mkdir -p "$claude/docs" "$claude/commands" "$claude/workflows" "$claude/scripts"
 
-# Constitution + schemas + codex adapter spec -> docs/
+# Constitution + operating card + schemas + codex adapter spec -> docs/
 cp "$repo/docs/agent-constitution.md"          "$claude/docs/agent-constitution.md"
+cp "$repo/docs/operating-card.md"              "$claude/docs/operating-card.md"
 cp "$repo/schema/mission-plan.schema.json"     "$claude/docs/mission-plan.schema.json"
 cp "$repo/schema/mission-record.schema.json"   "$claude/docs/mission-record.schema.json"
 cp "$repo/schema/cap-log.format.md"            "$claude/docs/cap-log.format.md"
@@ -20,9 +21,12 @@ cp "$repo/executors/mission-executor.codex.md" "$claude/docs/mission-executor.co
 # Skills -> commands/
 cp "$repo/skills/mission.md"        "$claude/commands/mission.md"
 cp "$repo/skills/evolve.md"         "$claude/commands/evolve.md"
-cp "$repo/skills/mission-accept.md" "$claude/commands/mission-accept.md"
+cp "$repo/skills/mission-log-audit.md" "$claude/commands/mission-log-audit.md"
 
 # Workflow executor -> workflows/
 cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-executor.workflow.js"
+
+# Deterministic helpers -> scripts/
+cp "$repo/scripts/classify-mission.js" "$claude/scripts/classify-mission.js"
 
 echo "Deployed long-mission-orchestrator -> $claude"

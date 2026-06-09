@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.1
+**Version:** 0.2
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -95,6 +95,60 @@ mistakes model-judged for machine-proven (§12). **V2 is judgment made legible, 
 verification.** Treat its green checks accordingly — strongest where work is mechanical
 (V0/V1), weakest exactly where the value of research lives.
 
+### 2.4 Mission classes (orchestration depth)
+
+V-class (§2) scales verification **per node**. It does **not** scale the *mission's own
+ceremony* — the plan-fight, the separate audit pass, the heartbeat, the go-gates. With only
+one dial, a two-line bug-fix pays the same GRILL→FIGHT→FREEZE→AUDIT envelope as an overnight
+research campaign: **the protocol marches an army for an errand.** Mission class is to
+orchestration what V-class is to verification — a deterministic dial that sizes the *protocol*
+to the *mission*.
+
+The class is computed at PLAN, after the DAG is drafted and before FIGHT, by a **deterministic
+classifier** (`scripts/classify-mission.js`, run by the orchestrator on the drafted plan — **not
+self-assigned by reasoning**; §1.3). It reads these facts from the plan:
+
+| Input | Meaning |
+|---|---|
+| `n` | node count |
+| `v_max` | highest V-class present in the plan |
+| `zone` | any node touches a declared deliverable zone (§8) |
+| `outward` | any node is outward-facing or irreversible |
+
+| Class | Gate (all must hold) | Orchestration depth |
+|---|---|---|
+| **M0 · errand** | `n ≤ 2` ∧ `v_max ≤ V1` ∧ ¬`zone` ∧ ¬`outward` | No FIGHT (a ≤2-node V0/V1 plan has no plan-level risk surface to attack). No separate AUDIT agent — recheck folds into the node's own close. No heartbeat. No attended go-gate. |
+| **M1 · standard** | default when neither M0 nor M2 holds | FIGHT 1 round, lenses scaled to plan size, early-exit if the round finds nothing material. AUDIT samples rechecks. Final-deliverable panel + heartbeat retained. |
+| **M2 · campaign** | `v_max = V3` ∨ `outward` ∨ large `n` ∨ explicitly overnight/high-stakes | Full machinery: FIGHT up to 3 rounds, full lens panel, AUDIT re-runs all checks, cold-reviewer rotation (§3.4), heartbeat. |
+
+Three rules keep this safe:
+
+1. **It scales ceremony, never floors.** Mission class may only reduce *plan-level* ceremony
+   (FIGHT, AUDIT-rerun-all, heartbeat, go-gates). It may **never** lower a V-class, skip a
+   critic mandated by §3.1, or touch a categorical floor (§2.2). The verifier — the whole game
+   (§1.2) — is untouched at every class. This is *why* M0 is safe: per-node close-time binding
+   (§2.1) and the critic floors still apply unchanged; only the *plan-attacking* ceremony,
+   which a trivial plan has no surface for, is dropped. Note M0 cannot collide with the §3.1
+   final-deliverable critic floor: any deliverable-assembly node is V2 by the §2.2 categorical
+   floor, which lifts `v_max` to ≥V2 and the mission to ≥M1. **M0 is by construction the region
+   of pure mechanical errands** (V0/V1, no zone, no outward surface) where no §3.1
+   final-deliverable critic binds — not a waiver of one.
+2. **Round up under uncertainty** — same asymmetry as §2.2. A mission borderline between two
+   classes takes the **higher**. M0 is granted only when its gate provably holds. **The classifier
+   computes a binding floor in code; the planner may only *raise* ceremony above it (judgment like
+   "high-stakes" → M2), never lower it** — and the executor re-derives the same floor as a backstop
+   (a hand-edited or under-classified plan cannot make M0 skip FIGHT/audit/go-gate). The "no model
+   call" guarantee is real because the floor is a script, not an LLM self-label.
+3. **Promotion is free; demotion is not.** A mission may be promoted mid-flight (a subtree
+   replan that grows the DAG past M0's bounds, or a newly discovered outward surface, promotes
+   it and arms the machinery it now needs). It is **never silently demoted**. Initial
+   classification errs high; experience corrects it downward **only on ground-truth evidence**
+   (§7 classification calibration) — never on a critic's opinion, which is correlated (§2.3).
+
+Mission class is **not a perimeter clause** (§9): it sizes ceremony, and the floors it must not
+cross are themselves perimeter-protected. It is therefore an evolution-tunable dial (§7), like
+the caps.
+
 ---
 
 ## 3. Actor–critic
@@ -170,6 +224,31 @@ green is the dangerous case; a review that already found issues needs no confirm
 Reserved to the **plan-fight and the final deliverable**, never routine nodes; net cost is at
 most one extra critic call per mission. Its thresholds are **evolution-tuned caps** (§6.2, §7):
 design adds the nerve, data tunes its sensitivity.
+
+### 3.5 Cold improver — fresh eyes that lift the draft (not a gate)
+
+§3.4's cold reviewer is a *verifier*: it confirms a clean terminal is genuinely converged, so
+finding nothing is a **success**. A second, distinct use of cold review is an *improver*: fresh
+independent eyes on a **first-draft** artifact whose job is to make it stronger, fed back to the
+actor for a revision it adopts with its own judgment. The first daylight mission exposed why
+this matters — the cold *verifier*, fired on an already-thrice-reviewed final summary, correctly
+found nothing; the high-yield position for cold review is the **fresh implementation draft**,
+where independent eyes reliably surface real improvements, and where the executor previously had
+**no path back to the actor** to act on them.
+
+| | Cold verifier (§3.4) | Cold improver (§3.5) |
+|---|---|---|
+| Artifact | the final, already-reviewed deliverable | a fresh implementation draft |
+| Stance | refute-framed gate; *return empty if sound* | advisory; always engages, surfaces concrete improvements |
+| Output | findings → adjudication → ledger/human | suggestions → the actor revises with its own judgment |
+| Success | finding nothing (genuine convergence) | lifting quality |
+
+**Honesty boundary.** The improver is a *quality* lever — correlated-model polishing of a draft
+(§2.3), legitimately strong for drafting, logged `[model]`. It raises what enters the
+verification gate; it **never closes** the gate or substitutes for a machine check, a §3.1
+critic, or a human. The revision loop can only improve or no-op — a botched revision is
+discarded, never regressing the node. Scoped by mission class (§2.4): M2 on by default for a-c
+implementation nodes, M1 opt-in on the riskiest, M0 never.
 
 ---
 
@@ -308,6 +387,34 @@ final deliverable and the plan-fight. Spend verification where the oracle is wea
 uniformly. A run that cannot afford its own verification narrows scope — it does **not** skip
 the gate.
 
+**Governance is not re-read in full by every worker.** The full constitution is the
+*orchestrator's* rulebook. An actor or critic needs only the handful of rules that bind its
+single step — the V-classes, the closure-record shape (§2.1), additive-only (§9.1), and
+citation-gated blockers (§3.3). Workers are therefore handed a distilled **operating card**
+(`~/.claude/docs/operating-card.md`, ~1–2 KB) rather than the full ~26 KB constitution. This
+preserves the fresh-context property (§1.4) — fresh context means *re-derived state, not
+re-read governance* — while cutting the per-spawn governance tax several-fold. The orchestrator
+alone loads the full constitution; the army carries the card.
+
+### 6.5 Parallelism by blast radius
+
+Worktree isolation makes concurrent file mutation *possible*; it does not decide where
+concurrency is *safe to attempt*. That decision is the **write-set** — the globs / namespaces /
+sections a node mutates. **Two nodes may run concurrently iff their write-sets are disjoint over
+a shared read-only context.**
+
+- *Code:* nodes mutating the same namespace with namespace-wide blast radius overlap → serial;
+  disjoint files → parallel.
+- *Prose:* section writers have disjoint write-sets over a shared read-only skeleton → parallel;
+  a reference checker writes only its report → disjoint → parallel with the writers.
+
+The planner declares each node's `write_set`; the executor **derives** parallelizability (no
+model call, §1.3): read-only nodes (`write_set: []`) fan out freely, mutating nodes fan out only
+as a disjoint subset under worktree isolation, and the disjoint constraint makes the integration
+merge **conflict-free by construction**. An absent write-set is conservative (serial) — a node
+earns fan-out by declaring its blast radius. The actor reports its *actual* write-set on
+completion; estimate-vs-actual feeds calibration (§7).
+
 ---
 
 ## 7. The three nested loops (self-evolution)
@@ -330,6 +437,18 @@ merge authority at every tier above the first.
 - **The human-diff is the gold signal.** What the Human changes or rejects the next morning
   is ground truth about where the framework misjudged. (Same epistemology as the
   ml-literacy consolidation protocol: the diff is the evidence.)
+- **Classification calibration (V-class and M-class).** The framework's two depth dials are
+  set by a *naive* orchestrator on the first run and sharpen with experience. Every
+  classification decision is recorded with its post-hoc correctness — generalizing the cap-hit
+  `would_have_converged` signal and the escalation-precision telemetry (§3.3) to the class
+  dials themselves. **Truth-source asymmetry is load-bearing and mirrors §2.2:** a critic or
+  auditor opinion that ceremony was excessive may only *raise* a class or *flag for the human*
+  — it may **never** license *lowering* one. Only the human-diff or a deterministic
+  machine-check may license a down-classification. Otherwise correlated models (§2.3) learn to
+  talk the system out of its own gates — the exact failure §9.4 exists to prevent. The
+  **matcher** that biases new classifications from this corpus (record-and-match) is *deferred*
+  until same-version N is large enough to beat the static gate (evolution.md): on an empty
+  corpus it is the static heuristic with extra steps. Record now; match later.
 - **Evolution review is itself a mission** under this protocol. Its deliverable is a batch
   of proposed amendments, each citing run-records. A proposal without supporting records is
   invalid.
@@ -339,10 +458,18 @@ merge authority at every tier above the first.
   - *Versioned constitution* — every run-record names the governing version, else analysis
     conflates regimes and learns nothing.
   - *Perimeter is off-limits to autonomous amendment* — see §9.
+- **Active intake, not passive review.** Human judgment is the scarcest resource (§1.2), and a
+  loop that waits for the Human to *remember* to review goes blind. The intake is therefore
+  **pushed on a cadence**: `/mission-log-audit` periodically scans the log, surfaces every item
+  needing a human call as a ranked **decision walk-through with recommendations and one-tap
+  verdicts** (§12), captures the answers, and routes them here. It **auto-skips when nothing is
+  pending** — attention is never spent on an empty review. This inverts the feedback economics:
+  the system batches what it needs and pulls it to the Human, who answers when free, rather than
+  depending on the Human to initiate.
 - **Implementation:** `docs/evolution.md` (data backbone + loop mechanics), the `/evolve`
-  skill (Tier-2 calibrate / Tier-3 evolve, runs as a mission), `/mission-accept` (captures
-  the human-diff gold signal), and the record schemas (`schema/mission-record.schema.json`,
-  `schema/cap-log.format.md`).
+  skill (Tier-2 calibrate / Tier-3 evolve, runs as a mission), `/mission-log-audit` (scans the
+  log, surfaces decisions, captures the human-diff gold signal), and the record schemas
+  (`schema/mission-record.schema.json`, `schema/cap-log.format.md`).
 
 ---
 
