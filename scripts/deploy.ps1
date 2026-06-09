@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $repo   = Split-Path -Parent $PSScriptRoot
 $claude = Join-Path $env:USERPROFILE ".claude"
 
-New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$claude\workflows" | Out-Null
+New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$claude\workflows", "$claude\scripts" | Out-Null
 
 # Constitution + operating card + schemas + codex adapter spec -> docs/
 Copy-Item "$repo\docs\agent-constitution.md"            "$claude\docs\agent-constitution.md"            -Force
@@ -24,6 +24,9 @@ Copy-Item "$repo\skills\mission-log-audit.md"   "$claude\commands\mission-log-au
 
 # Workflow executor -> workflows/
 Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\mission-executor.workflow.js" -Force
+
+# Deterministic helpers -> scripts/
+Copy-Item "$repo\scripts\classify-mission.js" "$claude\scripts\classify-mission.js" -Force
 
 Write-Host "Deployed long-mission-orchestrator -> $claude"
 Write-Host "  docs/      agent-constitution, schemas, codex adapter"

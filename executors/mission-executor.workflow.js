@@ -39,7 +39,25 @@ const C = plan.constitution_version || 'unknown'
 const REPO = plan.repo
 const MODE = plan.mode
 const ZONES = plan.deliverable_zones || []
-const MCLASS = plan.mission_class || 'M1'   // orchestration depth (§2.4); scales AUDIT here
+// Orchestration depth (§2.4). BACKSTOP for the deterministic classifier (scripts/classify-mission.js,
+// run at PLAN): re-derive the class FLOOR here so a hand-edited or under-classified plan cannot make
+// the executor's own decisions (audit depth) run below what the plan's facts permit. The planner may
+// raise above the floor, never below it. Discrepancy is logged for the report.
+const _V = { V0: 0, V1: 1, V2: 2, V3: 3 }, _CEREMONY = { M0: 0, M1: 1, M2: 2 }
+function _classFloor(p) {
+  const ns = (p && p.nodes) || []; if (!ns.length) return 'M1'
+  const vMax = ns.reduce((m, n) => Math.max(m, _V[n.v_class] != null ? _V[n.v_class] : 2), 0)
+  const zones = (p && p.deliverable_zones) || []
+  const touchesZone = ns.some(n => Array.isArray(n.write_set) &&
+    n.write_set.some(w => zones.some(z => w === z || w.includes(z) || z.includes(w))))
+  const unknownReach = ns.some(n => !Array.isArray(n.write_set))
+  if (vMax >= _V.V3) return 'M2'
+  return (ns.length <= 2 && vMax <= _V.V1 && !touchesZone && !unknownReach) ? 'M0' : 'M1'
+}
+const _claimedClass = plan.mission_class || 'M1'
+const _floorClass = _classFloor(plan)
+const MCLASS = (_CEREMONY[_claimedClass] != null ? _CEREMONY[_claimedClass] : 1) >= _CEREMONY[_floorClass]
+  ? _claimedClass : _floorClass
 
 // Default caps (constitution §6.2). Per-node overrides live on node.caps.
 const DEFAULT_CAPS = {
@@ -340,7 +358,9 @@ async function runNode(node) {
 
 // ── Main DAG walk: wave-based ready-set (correct for general DAG + dynamic replan) ──
 phase('Execute')
-log(`Mission ${plan.run_id} — ${plan.nodes.length} nodes, mode=${MODE}, constitution=${C}`)
+log(`Mission ${plan.run_id} — ${plan.nodes.length} nodes, mode=${MODE}, class=${MCLASS}, constitution=${C}`)
+if (MCLASS !== _claimedClass)
+  log(`⚠ Mission class floored ${_claimedClass} → ${MCLASS} (§2.4 backstop): plan under-classified vs deterministic floor.`)
 
 const doneSet = new Set(Object.keys(completed))
 const results = { ...completed }

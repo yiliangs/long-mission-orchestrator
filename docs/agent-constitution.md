@@ -104,8 +104,9 @@ research campaign: **the protocol marches an army for an errand.** Mission class
 orchestration what V-class is to verification — a deterministic dial that sizes the *protocol*
 to the *mission*.
 
-The class is computed at PLAN, after the DAG is drafted and before FIGHT, from **deterministic
-inputs only** (no model call — §1.3):
+The class is computed at PLAN, after the DAG is drafted and before FIGHT, by a **deterministic
+classifier** (`scripts/classify-mission.js`, run by the orchestrator on the drafted plan — **not
+self-assigned by reasoning**; §1.3). It reads these facts from the plan:
 
 | Input | Meaning |
 |---|---|
@@ -133,7 +134,11 @@ Three rules keep this safe:
    of pure mechanical errands** (V0/V1, no zone, no outward surface) where no §3.1
    final-deliverable critic binds — not a waiver of one.
 2. **Round up under uncertainty** — same asymmetry as §2.2. A mission borderline between two
-   classes takes the **higher**. M0 is granted only when its gate provably holds.
+   classes takes the **higher**. M0 is granted only when its gate provably holds. **The classifier
+   computes a binding floor in code; the planner may only *raise* ceremony above it (judgment like
+   "high-stakes" → M2), never lower it** — and the executor re-derives the same floor as a backstop
+   (a hand-edited or under-classified plan cannot make M0 skip FIGHT/audit/go-gate). The "no model
+   call" guarantee is real because the floor is a script, not an LLM self-label.
 3. **Promotion is free; demotion is not.** A mission may be promoted mid-flight (a subtree
    replan that grows the DAG past M0's bounds, or a newly discovered outward surface, promotes
    it and arms the machinery it now needs). It is **never silently demoted**. Initial

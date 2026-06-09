@@ -77,17 +77,22 @@ mutates; `[]` = read-only, fans out freely; §6.5), `v_class` (round up under un
 floors), `acceptance_criteria` (named, citable), caps (only if overriding defaults, with
 reason), `compute_role_required`. Leave `check` as TBD — it binds at close time.
 
-**Then classify the mission (§2.4).** From deterministic inputs only — `n` = node count,
-`v_max` = highest v_class, `zone` = any node hits a deliverable zone, `outward` = any node
-outward-facing/irreversible — assign `mission_class`:
+**Then classify the mission (§2.4) — by the deterministic classifier, NOT by reasoning.** Write
+the drafted DAG to a `plan.json` and run
+`node ~/.claude/scripts/classify-mission.js <plan.json> --write`. The script computes the binding
+class **floor** from deterministic facts (`n` = node count, `v_max` = highest v_class, `zone` =
+any node's `write_set` hits a deliverable zone) and writes `mission_class`. M0 is granted only
+when its crisp gate provably holds in code — the LLM never self-labels its way into skipping the
+go-gate. The gate the script enforces:
 - **M0 (errand):** `n ≤ 2` ∧ `v_max ≤ V1` ∧ ¬`zone` ∧ ¬`outward`.
 - **M2 (campaign):** `v_max = V3` ∨ `outward` ∨ large `n` ∨ explicitly overnight/high-stakes.
 - **M1 (standard):** everything else (the default).
 
-Round **up** under uncertainty (§2.2 asymmetry); grant M0 only when its gate provably holds.
-The class sizes the *ceremony* below (FIGHT / heartbeat / go-gate / AUDIT) — it never lowers a
-V-class floor or skips a §3.1-mandated critic. Record `mission_class` and the four classifier
-inputs in `plan.json`.
+You may **raise** the script's result to M2 on documented high-stakes judgment (§2.2 round-up),
+**never lower it** — the floor is binding and the executor re-derives it as a backstop. The class
+sizes the *ceremony* below (FIGHT / heartbeat / go-gate / AUDIT) — it never lowers a V-class floor
+or skips a §3.1-mandated critic. Record `mission_class` and the four classifier inputs in
+`plan.json`.
 
 **Flag the cold-improver pass (§3.5).** For **M1**, set `improve_pass:true` on the riskiest 1–2
 implementation nodes — a cold-improver→revision pass yields most on complex first-draft code.

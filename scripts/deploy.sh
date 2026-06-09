@@ -8,7 +8,7 @@ set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 claude="${HOME}/.claude"
 
-mkdir -p "$claude/docs" "$claude/commands" "$claude/workflows"
+mkdir -p "$claude/docs" "$claude/commands" "$claude/workflows" "$claude/scripts"
 
 # Constitution + operating card + schemas + codex adapter spec -> docs/
 cp "$repo/docs/agent-constitution.md"          "$claude/docs/agent-constitution.md"
@@ -25,5 +25,8 @@ cp "$repo/skills/mission-log-audit.md" "$claude/commands/mission-log-audit.md"
 
 # Workflow executor -> workflows/
 cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-executor.workflow.js"
+
+# Deterministic helpers -> scripts/
+cp "$repo/scripts/classify-mission.js" "$claude/scripts/classify-mission.js"
 
 echo "Deployed long-mission-orchestrator -> $claude"
