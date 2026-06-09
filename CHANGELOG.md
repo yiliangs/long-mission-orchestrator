@@ -23,6 +23,12 @@ partial reference runtime.
   write-set-disjoint nodes (decision layer; worktree fan-out deferred).
 - **Active decision loop** — `/mission-log-audit` scans the log and surfaces decisions to the
   human on a cadence (the active replacement for passive review; §7).
+- **§12 email channel wired** (`scripts/mailbridge.py` + `scripts/mission_mailbox.py`) — the proven
+  plaid-finance transport, standalone (stdlib-only). Missions email REPORT.md / decision
+  walk-throughs / proposals; an authenticated reply (sender + DMARC + an LMO-issued Message-ID)
+  routes into the fieldnotes run-record (verdicts) or `/evolve apply` (token-gated grants), fenced
+  by the §9 deny-list. Polled windowless by `LMO\MailboxPoll`. (Transport unit-tested; live
+  round-trip pending config + first mission.)
 - **Classification-calibration recording** — the pattern-observer's record half (features +
   `may_lower` truth-source asymmetry); the matcher is deferred.
 - **Role org-chart** README hero (`docs/role-diagram.png`, rendered via
