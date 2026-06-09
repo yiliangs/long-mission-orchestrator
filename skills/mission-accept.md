@@ -23,6 +23,12 @@ Given `<run-id>`, locate `<repo>/.mission/<run-id>/` and the run-record in
    - **Attribute the diff to nodes.** A large edit on a node the framework **self-closed
      (V0/V1)** is a verification gap — flag it loudly; that is exactly the misclassification
      §2.1 guards against, caught in the wild.
+   - **Fill classification verdicts (the calibration corpus, §7).** Where the diff shows a node
+     was mis-classified — a V2 node you left untouched (over-verified), or a self-closed V0/V1
+     node you heavily edited (under-verified) — set the matching
+     `classification_calibration.node_class_verdicts[]` entry with `evidence_source:"human_diff"`.
+     This is ground truth, so you may set `may_lower:true` — the **only** evidence that licenses
+     *lowering* a class on a like-shaped task next time (§2.2). A critic's opinion never can.
 2. **Record blocker verdicts.** For each blocker the mission escalated to you, mark
    `legit` or `noise` (from `$ARGUMENTS` or by asking). This is the escalation-precision
    telemetry; a falling legit-rate is evidence to tighten critic prompts (§3.3). Alert

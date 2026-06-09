@@ -235,6 +235,11 @@ original, some are sharp recombinations; all are load-bearing.
   maximum information, not up front.)
 - **The verifier is the whole game.** Autonomy is bounded by how cheaply "done" is checkable —
   treated as a hard design constraint, not an afterthought.
+- **Mission-size ladder (M0–M2).** A second dial beside the V-ladder: V-class sizes
+  *verification per node*, mission class sizes *ceremony per mission*. A two-line errand skips
+  the plan-fight, the heartbeat, and the separate audit a research campaign earns — so the
+  protocol stops *marching an army for a typo*. It scales ceremony only, never the verification
+  floors; round up under uncertainty, promote mid-flight freely, never silently demote.
 
 ### Adversarial review without sycophancy
 - **Triangulated adjudication.** Actor and critic never talk directly; each speaks only to an
@@ -348,13 +353,22 @@ but stated plainly so the "deterministic shell" claim stays honest. The Claude C
 fan-out, close-time binding (V0/V1 self-closure requires a recorded passing check, else
 auto-downgrade to a critic), the micro-loop retry, one actor→critic→adjudicate pass, and the
 token-frugal slice of **cold-reviewer rotation** (§3.4) — one cold reviewer fires only to
-double-check a *clean* verdict on the final deliverable, with free deterministic detection.
+double-check a *clean* verdict on the final deliverable, with free deterministic detection. It
+also implements **mission-class–scaled AUDIT** (§2.4: `M0` skips the separate audit agent and
+returns a deterministic verdict, `M1` samples the rechecks, `M2` re-runs all) and the
+**operating-card governance split** (§6.4: spawned workers carry the ~1.5 KB
+`docs/operating-card.md`, not the full ~26 KB constitution). The latest pass adds the
+**cold-improver→actor-revision loop** (§3.5) on a-c implementation nodes (mission-class-scoped),
+trims the final-deliverable panel to two lenses, and hardens the executor against
+string-delivered `args`.
 
 **Specified but not yet in the executor — Phase 1 work:**
 - **Subtree replan** (the ladder's top rung) — currently the node is marked done-with-defect
   and the walk continues; it does not yet redraw the branch.
-- **In-node rebuttal round** — §3.3 grants the actor one evidence-based rebuttal per finding;
-  the code runs actor→critic once and returns `blocked` without the rebuttal cycle.
+- **In-node rebuttal round** — *partly closed:* the cold-improver→actor-revision loop (§3.5)
+  now feeds independent review back to the actor on fresh impl drafts. Still missing the §3.3
+  **gate-critic** rebuttal — when a *gate* critic raises a blocker/major, the actor still gets no
+  evidence-based rebuttal round; those findings route straight to adjudication/ledger.
 - **Audit → punchlist → fix loop** — AUDIT assembles the punchlist but does not yet re-enter
   EXECUTE to work it.
 - **Full cold-reviewer rotation (§3.4)** — the mid-debate convergence-detect-and-reseed across

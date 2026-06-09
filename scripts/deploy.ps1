@@ -9,8 +9,9 @@ $claude = Join-Path $env:USERPROFILE ".claude"
 
 New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$claude\workflows" | Out-Null
 
-# Constitution + schemas + codex adapter spec -> docs/
+# Constitution + operating card + schemas + codex adapter spec -> docs/
 Copy-Item "$repo\docs\agent-constitution.md"            "$claude\docs\agent-constitution.md"            -Force
+Copy-Item "$repo\docs\operating-card.md"                "$claude\docs\operating-card.md"                -Force
 Copy-Item "$repo\schema\mission-plan.schema.json"       "$claude\docs\mission-plan.schema.json"         -Force
 Copy-Item "$repo\schema\mission-record.schema.json"     "$claude\docs\mission-record.schema.json"       -Force
 Copy-Item "$repo\schema\cap-log.format.md"              "$claude\docs\cap-log.format.md"                -Force

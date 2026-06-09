@@ -22,6 +22,22 @@
       "type": "string",
       "description": "Version of agent-constitution.md governing this run. Required for evolution-loop comparability (§7)."
     },
+    "mission_class": {
+      "enum": ["M0", "M1", "M2"],
+      "default": "M1",
+      "description": "Orchestration depth (§2.4), computed at PLAN from classifier_inputs by a deterministic gate (no model call). Sizes plan-level ceremony — FIGHT, heartbeat, attended go-gate, AUDIT depth. NEVER lowers a V-class floor or skips a §3.1-mandated critic. Round UP under uncertainty; promotion mid-flight is free, demotion never silent."
+    },
+    "classifier_inputs": {
+      "type": "object",
+      "description": "The deterministic inputs that produced mission_class (§2.4). Recorded for audit and for classification calibration (§7).",
+      "additionalProperties": false,
+      "properties": {
+        "n": { "type": "integer", "description": "Node count." },
+        "v_max": { "enum": ["V0", "V1", "V2", "V3"], "description": "Highest v_class present in the plan." },
+        "zone": { "type": "boolean", "description": "Any node touches a declared deliverable zone (§8)." },
+        "outward": { "type": "boolean", "description": "Any node is outward-facing or irreversible." }
+      }
+    },
     "compute_role_required": {
       "enum": ["light", "heavy", "any"],
       "default": "any",
@@ -103,7 +119,11 @@
         "is_final_deliverable": {
           "type": "boolean",
           "default": false,
-          "description": "Marks the final assembly node. Forces ac_required=true and a 3-lens critic panel (§6.2)."
+          "description": "Marks the final assembly node. Forces ac_required=true and a critic panel (correctness + completeness lenses) plus the cold verifier (§3.4)."
+        },
+        "improve_pass": {
+          "type": "boolean",
+          "description": "Run a cold-improver→actor-revision quality pass on this node's FIRST DRAFT (§3.4 improver / §3.3 revision). Applies to a-c implementation nodes (not the final deliverable, which the panel already covers). Default by mission class: M2 on (opt-out with false), M1 off (opt-in with true — flag the riskiest 1-2 impl nodes), M0 never. Quality lever, not verification."
         }
       }
     }

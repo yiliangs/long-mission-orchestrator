@@ -22,6 +22,59 @@
     "started_at": { "type": ["string", "null"] },
     "delivered_at": { "type": ["string", "null"] },
     "outcome": { "enum": ["DELIVERED", "DIVERGED"] },
+    "mission_class": {
+      "enum": ["M0", "M1", "M2"],
+      "description": "Orchestration depth the mission ran at (§2.4). Recorded for classification calibration."
+    },
+
+    "classification_calibration": {
+      "type": "object",
+      "description": "The classification-observer corpus (§7 classification calibration) — the record-and-match signal for the V-class and M-class dials. TRUTH-SOURCE ASYMMETRY (§2.2/§2.3) is enforced by the `may_lower` flags: a critic/auditor opinion may only license RAISING a class or flagging for the human; only a human_diff or machine_check may license LOWERING one. The matcher that consumes this corpus is deferred until same-version N is large (evolution.md).",
+      "additionalProperties": false,
+      "properties": {
+        "mission_class_assigned": { "enum": ["M0", "M1", "M2"] },
+        "mission_class_verdict": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "description": "Hindsight on whether the mission was over- or under-provisioned.",
+          "properties": {
+            "should_have_been": { "enum": ["M0", "M1", "M2"] },
+            "direction": { "enum": ["over_provisioned", "under_provisioned", "correct"] },
+            "evidence_source": { "enum": ["human_diff", "machine_check", "critic_opinion"] },
+            "may_lower": {
+              "type": "boolean",
+              "description": "MUST be false unless evidence_source is human_diff or machine_check. A critic_opinion can never set this true (§2.2 asymmetry) — it may only flag for the human or argue UP."
+            }
+          }
+        },
+        "node_class_verdicts": {
+          "type": "array",
+          "description": "Per-node V-class hindsight. A node escalated to a critic that found nothing, or a V2 node the human-diff left untouched, is an over-classification candidate — but only human/machine evidence may license down-classifying that node-shape next time.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "node": { "type": "string" },
+              "features": {
+                "type": "object",
+                "description": "The shape signal a future matcher keys on — recorded NOW so the corpus has signal (§7, record-now-match-later). Globs + applicable-verifier are the strong signals; instruction_gist is weak/secondary.",
+                "additionalProperties": false,
+                "properties": {
+                  "path_globs": { "type": "array", "items": { "type": "string" }, "description": "Globs/paths the node touched — the primary shape signal." },
+                  "applicable_verifier": { "type": ["string", "null"], "description": "Repo-contract verifier-registry entry that applied; null = no machine check exists (a strong V2 signal)." },
+                  "planner_first_class": { "enum": ["V0", "V1", "V2", "V3"], "description": "Class the planner first reached for BEFORE §2.2 round-up — captures the rounding decision the matcher can learn to keep or override." },
+                  "instruction_gist": { "type": ["string", "null"], "description": "Short normalized task description; weak signal, secondary to globs + verifier." }
+                }
+              },
+              "v_class_assigned": { "enum": ["V0", "V1", "V2", "V3"] },
+              "should_have_been": { "enum": ["V0", "V1", "V2", "V3"] },
+              "evidence_source": { "enum": ["human_diff", "machine_check", "critic_opinion"] },
+              "may_lower": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
 
     "plan_vs_executed": {
       "type": "object",

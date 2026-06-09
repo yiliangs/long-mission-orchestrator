@@ -10,8 +10,9 @@ claude="${HOME}/.claude"
 
 mkdir -p "$claude/docs" "$claude/commands" "$claude/workflows"
 
-# Constitution + schemas + codex adapter spec -> docs/
+# Constitution + operating card + schemas + codex adapter spec -> docs/
 cp "$repo/docs/agent-constitution.md"          "$claude/docs/agent-constitution.md"
+cp "$repo/docs/operating-card.md"              "$claude/docs/operating-card.md"
 cp "$repo/schema/mission-plan.schema.json"     "$claude/docs/mission-plan.schema.json"
 cp "$repo/schema/mission-record.schema.json"   "$claude/docs/mission-record.schema.json"
 cp "$repo/schema/cap-log.format.md"            "$claude/docs/cap-log.format.md"
