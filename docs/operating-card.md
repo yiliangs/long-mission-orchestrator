@@ -15,7 +15,10 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
    `{ check_command, exit_status, output_digest, timestamp }`. No passing recorded check ⇒ do
    **not** claim done — report `outcome:"failed"` with notes, or say in notes the task is
    genuinely judgment-bound (it will be downgraded to V2 and sent to a critic). Self-report
-   never closes work.
+   never closes work. **On Windows/PowerShell, run the repo contract's verifier command
+   verbatim** — don't re-quote or translate paths; shell-quoting drift causes spurious check
+   failures. Stamp the `closure_record` timestamp with **real wall-clock time** from your
+   environment, never a placeholder.
 3. **If the node's acceptance criteria are themselves wrong** or a dependency surprise makes
    them unreachable: `outcome:"plan_assumption_false"` with a `replan_reason`. Don't grind a
    wrong plan.

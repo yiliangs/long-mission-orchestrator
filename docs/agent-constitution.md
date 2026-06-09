@@ -391,6 +391,25 @@ preserves the fresh-context property (§1.4) — fresh context means *re-derived
 re-read governance* — while cutting the per-spawn governance tax several-fold. The orchestrator
 alone loads the full constitution; the army carries the card.
 
+### 6.5 Parallelism by blast radius
+
+Worktree isolation makes concurrent file mutation *possible*; it does not decide where
+concurrency is *safe to attempt*. That decision is the **write-set** — the globs / namespaces /
+sections a node mutates. **Two nodes may run concurrently iff their write-sets are disjoint over
+a shared read-only context.**
+
+- *Code:* nodes mutating the same namespace with namespace-wide blast radius overlap → serial;
+  disjoint files → parallel.
+- *Prose:* section writers have disjoint write-sets over a shared read-only skeleton → parallel;
+  a reference checker writes only its report → disjoint → parallel with the writers.
+
+The planner declares each node's `write_set`; the executor **derives** parallelizability (no
+model call, §1.3): read-only nodes (`write_set: []`) fan out freely, mutating nodes fan out only
+as a disjoint subset under worktree isolation, and the disjoint constraint makes the integration
+merge **conflict-free by construction**. An absent write-set is conservative (serial) — a node
+earns fan-out by declaring its blast radius. The actor reports its *actual* write-set on
+completion; estimate-vs-actual feeds calibration (§7).
+
 ---
 
 ## 7. The three nested loops (self-evolution)

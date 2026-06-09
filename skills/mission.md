@@ -71,7 +71,8 @@ PLAN — a vague grill is the cheapest place to fail and the most expensive plac
 
 ### 2. PLAN
 Draft a DAG conforming to `~/.claude/docs/mission-plan.schema.json`. For each node assign:
-deps, `parallelizable`, `v_class` (round up under uncertainty; honor categorical V2 floors
+deps, `parallelizable` + `write_set` (the blast radius — globs/namespaces/section-ids it
+mutates; `[]` = read-only, fans out freely; §6.5), `v_class` (round up under uncertainty; honor categorical V2 floors
 §2.2), `ac_required` (true for all V2 / outward-facing / final-deliverable nodes — the
 floors), `acceptance_criteria` (named, citable), caps (only if overriding defaults, with
 reason), `compute_role_required`. Leave `check` as TBD — it binds at close time.

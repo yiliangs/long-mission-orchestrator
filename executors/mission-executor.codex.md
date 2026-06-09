@@ -15,7 +15,7 @@ adapter.
 |---|---|
 | **Input** | The frozen `plan.json` at `<repo>/.mission/<run-id>/plan.json`. Codex has filesystem access, so it reads the path directly (unlike the Workflow sandbox, which receives the parsed object via `args`). |
 | **DAG walk** | Wave-based ready-set: a node is ready when all `deps` are complete. Fan out `parallelizable` ready nodes; run the rest sequentially. |
-| **Fan-out isolation** | Concurrent file-mutating nodes get isolated working trees (git worktree). |
+| **Fan-out isolation** | A node fans out only when concurrency is safe (§6.5 blast radius): read-only nodes (`write_set:[]`) freely; mutating nodes only as a write-set-DISJOINT subset under worktree isolation, merged conflict-free by construction. Absent `write_set` ⇒ serial. |
 | **Actor** | One agent per node. Returns the same actor result shape: `{outcome, artifact_summary, closure_record?, replan_reason?}`. |
 | **Close-time binding (§2.1)** | V0/V1 node ⇒ executor selects + runs a concrete check (prefer the repo contract's verifier registry vocabulary), records `{check_command, exit_status, output_digest, timestamp}`. No valid passing record ⇒ downgrade to V2 + spawn critic. |
 | **Problem-solving ladder (§6.1)** | micro-loop (retry, cap 3) → structured sub-loop (fresh agent per iteration) → subtree replan. Same caps as §6.2 unless `node.caps` overrides. |

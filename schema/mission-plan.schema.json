@@ -74,7 +74,12 @@
         },
         "parallelizable": {
           "type": "boolean",
-          "description": "If true and ready, may fan out alongside sibling parallelizable nodes. Nodes that mutate shared files concurrently get worktree isolation."
+          "description": "Planner intent that this node MAY fan out. Actual fan-out also requires a declared write_set (§6.5 blast-radius rule): read-only nodes (write_set: []) fan out freely; mutating nodes fan out only as a write-set-disjoint subset under worktree isolation."
+        },
+        "write_set": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Blast radius: the globs / namespaces / section-ids this node MUTATES (§6.5). Two nodes may run concurrently only if their write_sets are DISJOINT over a shared read-only context. Empty array = declares read-only (always safe to fan out). Absent = unknown, so conservative serial. The executor derives parallelizability from this; the actor reports its ACTUAL write_set on completion to calibrate the estimate (§7)."
         },
         "v_class": {
           "enum": ["V0", "V1", "V2", "V3"],

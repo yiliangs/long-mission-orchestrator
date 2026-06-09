@@ -131,7 +131,8 @@ Do the work on the agent branch. Then:
 - If this node is V0/V1: SELECT and RUN a concrete check (prefer a name from the repo
   contract's verifier registry; "${node.check || 'TBD'}" is a suggestion only). You may
   only report outcome="done" if the check actually passed — return its closure_record
-  {check_command, exit_status, output_digest, timestamp}. No passing recorded check ⇒ do
+  {check_command, exit_status, output_digest, timestamp}. The timestamp MUST be the real
+  wall-clock time from your environment, never a placeholder like 00:00:00Z. No passing recorded check ⇒ do
   NOT claim done; report outcome="failed" with notes, OR if the task is genuinely
   judgment-bound, say so in notes (it will be downgraded to V2).
 - If you discover the node's acceptance criteria are themselves wrong / a dependency
@@ -352,9 +353,24 @@ while (doneSet.size < nodes.length) {
     log('No ready nodes and DAG incomplete — dependency deadlock or all-blocked. Finalizing (diverged).')
     break
   }
-  // Fan out the parallelizable ready nodes together; run the rest one-by-one this wave.
-  const par = ready.filter(n => n.parallelizable)
-  const seq = ready.filter(n => !n.parallelizable)
+  // Blast-radius parallelism (§6.5): a node fans out only when concurrency is provably safe.
+  //  - write_set: []  (declared read-only)  ⇒ no mutation, no race ⇒ fan out freely NOW.
+  //  - write_set: [g] (declared mutating)   ⇒ safe only as a write-set-DISJOINT subset, AND
+  //    only under worktree isolation + conflict-free integration merge — that mechanical wiring
+  //    is a documented follow-up (harness daylight test pending), so for now the disjoint subset
+  //    is COMPUTED and LOGGED but run serially (correct, just not yet concurrent).
+  //  - no write_set ⇒ conservative serial. A planner earns fan-out by declaring blast radius.
+  const declaresRO  = n => Array.isArray(n.write_set) && n.write_set.length === 0
+  const declaresMut = n => Array.isArray(n.write_set) && n.write_set.length > 0
+  const par = ready.filter(n => n.parallelizable && declaresRO(n))            // read-only ⇒ safe now
+  const seq = ready.filter(n => !(n.parallelizable && declaresRO(n)))         // everything else serial
+
+  // Surface the mutating nodes that ARE write-set-disjoint (would fan out once worktrees land).
+  const disjoint = []
+  for (const n of ready.filter(n => n.parallelizable && declaresMut(n)))
+    if (!disjoint.some(c => c.write_set.some(x => n.write_set.includes(x)))) disjoint.push(n)
+  if (disjoint.length > 1)
+    log(`Write-set-disjoint, safe to fan out (worktree+merge wiring pending): ${disjoint.map(n => n.id).join(', ')}`)
 
   const waveResults = []
   if (par.length) waveResults.push(...await parallel(par.map(n => () => runNode(n))))
