@@ -6,21 +6,53 @@ sharper every time you correct it.
 A framework for running **autonomous coding and writing missions** under a governing
 constitution, for both software (internal tooling) and academic work (papers, experiments).
 
+Who does what — and notice the verifiers outnumber the workers, by design:
+
 ```mermaid
 flowchart TD
-    H(["You: point at a goal"]) --> GRILL(["You + AI grill it<br/>resolve every branch"])
-    GRILL --> PLAN["PLAN → critic fights it → FREEZE"]
-    PLAN --> EX(["EXECUTE<br/>workers, each shadowed by a checker"])
-    EX --> PROVE["Proven done<br/>tests & critics, not promises"]
-    PROVE --> DELIVER(["You wake up to<br/>a finished, audited result"])
-    DELIVER -.->|"what you correct → next mission"| H
+    H(["👤 You — set the goal · grill it · review the result"])
+
+    H --> PL["PLANNER<br/>drafts the plan"]
+
+    subgraph FIGHT["critics fight the plan"]
+        direction LR
+        FC1["CRITIC"]
+        FC2["CRITIC"]
+        FC3["CRITIC"]
+    end
+    PL --> FC1 & FC2 & FC3
+    FC1 & FC2 & FC3 --> FZ(["FREEZE the plan"])
+
+    subgraph WORK["EXECUTORS fan out — one per task, in parallel"]
+        direction LR
+        E1["EXECUTOR"] <-->|"redo"| K1["CRITIC"]
+        E2["EXECUTOR"] <-->|"redo"| K2["CRITIC"]
+        E3["EXECUTOR"] <-->|"redo"| K3["CRITIC"]
+    end
+    FZ --> E1 & E2 & E3
+
+    K1 & K2 & K3 --> CR["COLD-REVIEWER<br/>fresh eyes on a clean pass"]
+    CR --> AU["AUDITOR<br/>re-checks the whole mission"]
+    AU --> DL(["DELIVER — proven, not promised"])
+    DL -.->|"what you correct → next mission"| H
+
+    classDef human fill:#111827,stroke:#9ca3af,color:#f9fafb
+    classDef worker fill:#0e7490,stroke:#67e8f9,color:#ecfeff
+    classDef checker fill:#7c2d12,stroke:#fdba74,color:#fff7ed
+    classDef gate fill:#3730a3,stroke:#a5b4fc,color:#eef2ff
+    class H human
+    class PL,E1,E2,E3 worker
+    class FC1,FC2,FC3,K1,K2,K3,CR,AU checker
+    class FZ,DL gate
 ```
 
 **The whole thing rests on one idea: the value is in proving "done," not in typing the code.**
-You grill the goal up front — the one human-in-the-loop moment — then it runs autonomously: a
-critic fights the plan, the work fans out into checked tasks, and a *verifier* (a test, a second
-opinion, not the worker's own say-so) decides when it's actually finished. What you change in the
-morning feeds the next run.
+You grill the goal up front — the one human-in-the-loop moment — then the roles take over: a
+**planner** drafts the plan, **critics** fight it, **executors** fan out in parallel (each
+shadowed by its own **critic** in a redo loop), a **cold-reviewer** brings fresh eyes to a clean
+pass, and an **auditor** re-verifies the whole mission. A *verifier* — a test or an independent
+critic, never the worker's own say-so — decides when something is finished, and what you change in
+the morning feeds the next run.
 
 > **Honest scope.** Autonomy is strongest where verification is cheap (compiles, tests pass,
 > citation resolves) and on *drafting* (generate-and-rank). It is weakest exactly where research
