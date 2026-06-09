@@ -163,7 +163,7 @@ Then **deliver**:
   by you — not synthesized. Include the human-diff slot (filled when the Human reviews).
   Populate `classification_calibration`: `mission_class` + per-node `features` and assigned
   classes. Leave the hindsight verdicts **null** — AUDIT fills any machine-check verdicts
-  (`evidence_source:"machine_check"`), `/mission-accept` fills the human-diff verdicts. A critic
+  (`evidence_source:"machine_check"`), `/mission-log-audit` fills the human-diff verdicts. A critic
   opinion may write a verdict but **never** `may_lower:true` (§2.2 / schema).
 - Append cap stats to `mission-caps.jsonl` (fieldnotes).
 - **Push** the verdict line (notification). **Email** REPORT.md (plaid-finance channel).

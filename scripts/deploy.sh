@@ -21,7 +21,7 @@ cp "$repo/executors/mission-executor.codex.md" "$claude/docs/mission-executor.co
 # Skills -> commands/
 cp "$repo/skills/mission.md"        "$claude/commands/mission.md"
 cp "$repo/skills/evolve.md"         "$claude/commands/evolve.md"
-cp "$repo/skills/mission-accept.md" "$claude/commands/mission-accept.md"
+cp "$repo/skills/mission-log-audit.md" "$claude/commands/mission-log-audit.md"
 
 # Workflow executor -> workflows/
 cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-executor.workflow.js"

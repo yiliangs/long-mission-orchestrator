@@ -14,7 +14,7 @@ mission, are the entire substrate:
 |---|---|---|---|
 | `mission_records/<run-id>.json` | at DELIVER | orchestrator, **not synthesized** | `schema/mission-record.schema.json` |
 | `mission-caps.jsonl` (append) | at DELIVER | orchestrator | `schema/cap-log.format.md` |
-| `human_review` block of the record | when you review | `/mission-accept` | (same record) |
+| `human_review` block of the record | when you review | `/mission-log-audit` | (same record) |
 
 All three live in **claude-fieldnotes** (telemetry repo), synced across machines, so both
 the light box and the 5090 feed one dataset. The governance repo (long-mission-orchestrator) holds the
@@ -26,7 +26,10 @@ The single most valuable field is `human_review.human_diff_stat`: the diff betwe
 mission **delivered** and what you **accepted**. It is the only ground truth for where the
 framework misjudged — everything else is the framework grading its own homework. This is the
 same epistemology as the ml-literacy consolidation protocol: *the diff is the evidence.*
-Without `/mission-accept`, the loop is blind.
+`/mission-log-audit` **pushes** this capture to the Human on a cadence (§7 active intake) — it is
+not awaited — so the loop is never blind merely because the Human forgot to review. Human
+attention is the scarcest resource; the system batches what it needs and pulls it, rather than
+depending on the Human to initiate.
 
 ## Tier 1 — Missions (per goal)
 

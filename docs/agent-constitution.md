@@ -453,10 +453,18 @@ merge authority at every tier above the first.
   - *Versioned constitution* — every run-record names the governing version, else analysis
     conflates regimes and learns nothing.
   - *Perimeter is off-limits to autonomous amendment* — see §9.
+- **Active intake, not passive review.** Human judgment is the scarcest resource (§1.2), and a
+  loop that waits for the Human to *remember* to review goes blind. The intake is therefore
+  **pushed on a cadence**: `/mission-log-audit` periodically scans the log, surfaces every item
+  needing a human call as a ranked **decision walk-through with recommendations and one-tap
+  verdicts** (§12), captures the answers, and routes them here. It **auto-skips when nothing is
+  pending** — attention is never spent on an empty review. This inverts the feedback economics:
+  the system batches what it needs and pulls it to the Human, who answers when free, rather than
+  depending on the Human to initiate.
 - **Implementation:** `docs/evolution.md` (data backbone + loop mechanics), the `/evolve`
-  skill (Tier-2 calibrate / Tier-3 evolve, runs as a mission), `/mission-accept` (captures
-  the human-diff gold signal), and the record schemas (`schema/mission-record.schema.json`,
-  `schema/cap-log.format.md`).
+  skill (Tier-2 calibrate / Tier-3 evolve, runs as a mission), `/mission-log-audit` (scans the
+  log, surfaces decisions, captures the human-diff gold signal), and the record schemas
+  (`schema/mission-record.schema.json`, `schema/cap-log.format.md`).
 
 ---
 

@@ -20,12 +20,12 @@ Copy-Item "$repo\executors\mission-executor.codex.md"   "$claude\docs\mission-ex
 # Skills -> commands/
 Copy-Item "$repo\skills\mission.md"          "$claude\commands\mission.md"         -Force
 Copy-Item "$repo\skills\evolve.md"           "$claude\commands\evolve.md"          -Force
-Copy-Item "$repo\skills\mission-accept.md"   "$claude\commands\mission-accept.md"  -Force
+Copy-Item "$repo\skills\mission-log-audit.md"   "$claude\commands\mission-log-audit.md"  -Force
 
 # Workflow executor -> workflows/
 Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\mission-executor.workflow.js" -Force
 
 Write-Host "Deployed long-mission-orchestrator -> $claude"
 Write-Host "  docs/      agent-constitution, schemas, codex adapter"
-Write-Host "  commands/  /mission /evolve /mission-accept"
+Write-Host "  commands/  /mission /evolve /mission-log-audit"
 Write-Host "  workflows/ mission-executor.workflow.js"

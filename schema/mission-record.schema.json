@@ -143,7 +143,7 @@
 
     "human_review": {
       "type": "object",
-      "description": "Filled by /mission-accept when the Human reviews. THE GOLD SIGNAL (§7): the diff between delivered and accepted is ground truth for where the framework misjudged.",
+      "description": "Filled by /mission-log-audit when the Human reviews. THE GOLD SIGNAL (§7): the diff between delivered and accepted is ground truth for where the framework misjudged.",
       "additionalProperties": false,
       "required": ["reviewed"],
       "properties": {

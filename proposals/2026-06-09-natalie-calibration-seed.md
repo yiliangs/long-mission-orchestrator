@@ -4,7 +4,7 @@ Status: **drafted for review — not written to fieldnotes.** This is the first
 `classification_calibration` data point (§7), drawn from the natalie daylight mission
 (run `a11bb840…`). It is **critic-evidence only**, so every `may_lower` is `false`: a critic's
 opinion may flag/raise a class but can **never** authorize lowering one (§2.2 asymmetry). To
-license a down-classification you must supply the human-diff via `/mission-accept` — at which
+license a down-classification you must supply the human-diff via `/mission-log-audit` — at which
 point I upgrade these entries to `evidence_source: "human_diff"` and `may_lower: true` where your
 review agrees.
 
@@ -67,7 +67,7 @@ bbox-scaling assertion — both machine-checkable with a harness, not taste).
 
 ## To confirm / upgrade
 
-- **Run `/mission-accept` on the natalie run.** Where your human-diff shows one of these nodes
+- **Run `/mission-log-audit` on the natalie run.** Where your human-diff shows one of these nodes
   shipped a defect the V2 gate missed, I set `evidence_source: "human_diff"` and `may_lower:true`
   on that entry, and (with your nod) write the record to `fieldnotes/mission_records/`.
 - Or tell me to **discard** this seed if you'd rather start the corpus clean from the first v0.2

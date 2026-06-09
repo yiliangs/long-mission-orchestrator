@@ -317,7 +317,7 @@ long-mission-orchestrator/
 ├── skills/
 │   ├── mission.md                  # /mission: run a mission
 │   ├── evolve.md                   # /evolve: scheduled self-improvement review
-│   └── mission-accept.md           # /mission-accept: capture the gold signal
+│   └── mission-log-audit.md           # /mission-log-audit: capture the gold signal
 ├── executors/
 │   ├── mission-executor.workflow.js  # Claude Code adapter (proven)
 │   └── mission-executor.codex.md     # Codex adapter (deferred)
