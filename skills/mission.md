@@ -171,7 +171,9 @@ Then **deliver**:
   (`evidence_source:"machine_check"`), `/mission-log-audit` fills the human-diff verdicts. A critic
   opinion may write a verdict but **never** `may_lower:true` (§2.2 / schema).
 - Append cap stats to `mission-caps.jsonl` (fieldnotes).
-- **Push** the verdict line (notification). **Email** REPORT.md (plaid-finance channel).
+- **Push** the verdict line (notification). **Email** REPORT.md via the deployed §12 channel:
+  `python ~/.claude/scripts/mission_mailbox.py report <run-id>` (mints a reply-id so the Human's
+  reply threads back and is routed by `LMO\MailboxPoll` into the run-record).
 - **Disarm the heartbeat**; leave `.mission/<run-id>/` for review (archived on branch
   merge).
 

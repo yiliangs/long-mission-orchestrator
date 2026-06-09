@@ -28,7 +28,15 @@ Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\miss
 # Deterministic helpers -> scripts/
 Copy-Item "$repo\scripts\classify-mission.js" "$claude\scripts\classify-mission.js" -Force
 
+# Email channel (constitution §12) -> scripts/  (config lives at ~/.claude\mailbridge.env, not synced)
+Copy-Item "$repo\scripts\mailbridge.py"          "$claude\scripts\mailbridge.py"          -Force
+Copy-Item "$repo\scripts\mission_mailbox.py"     "$claude\scripts\mission_mailbox.py"     -Force
+Copy-Item "$repo\scripts\run_mailbox_poll.cmd"   "$claude\scripts\run_mailbox_poll.cmd"   -Force
+Copy-Item "$repo\scripts\run_hidden.vbs"         "$claude\scripts\run_hidden.vbs"         -Force
+Copy-Item "$repo\scripts\mailbridge.env.example" "$claude\scripts\mailbridge.env.example" -Force
+
 Write-Host "Deployed long-mission-orchestrator -> $claude"
 Write-Host "  docs/      agent-constitution, schemas, codex adapter"
 Write-Host "  commands/  /mission /evolve /mission-log-audit"
 Write-Host "  workflows/ mission-executor.workflow.js"
+Write-Host "  scripts/   classify-mission, mailbridge + mission_mailbox (email channel)"

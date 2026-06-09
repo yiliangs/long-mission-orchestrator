@@ -49,8 +49,12 @@ Ranked by **leverage × staleness**, phone-readable (inverted pyramid, §12). Ea
 - **One-tap options** — `(a) accept rec · (b) <alternative> · (c) defer`.
 - **Evidence** — a ref (run-id, file:line, ledger entry).
 
-Deliver via **push** + **email** (§12 channels) + a markdown file the Human can reply to inline.
-Lead with the highest-leverage item; never bury a perimeter decision below routine ones.
+Deliver via **push** + **email** + a markdown file the Human can reply to inline: write the
+walk-through to a file, then `python ~/.claude/scripts/mission_mailbox.py walkthrough <file.md>
+--ref <run-id>` (the deployed §12 channel). The Human's reply is polled by `LMO\MailboxPoll` and
+routed into the run-record `human_review` block automatically — so the *Capture* below happens
+without you re-initiating. Lead with the highest-leverage item; never bury a perimeter decision
+below routine ones.
 
 ## Capture (the Human's answers ARE the gold signal)
 

@@ -29,4 +29,11 @@ cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-exe
 # Deterministic helpers -> scripts/
 cp "$repo/scripts/classify-mission.js" "$claude/scripts/classify-mission.js"
 
+# Email channel (constitution §12) -> scripts/  (config lives at ~/.claude/mailbridge.env, not synced)
+cp "$repo/scripts/mailbridge.py"          "$claude/scripts/mailbridge.py"
+cp "$repo/scripts/mission_mailbox.py"     "$claude/scripts/mission_mailbox.py"
+cp "$repo/scripts/run_mailbox_poll.cmd"   "$claude/scripts/run_mailbox_poll.cmd"
+cp "$repo/scripts/run_hidden.vbs"         "$claude/scripts/run_hidden.vbs"
+cp "$repo/scripts/mailbridge.env.example" "$claude/scripts/mailbridge.env.example"
+
 echo "Deployed long-mission-orchestrator -> $claude"

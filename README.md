@@ -103,6 +103,8 @@ long-mission-orchestrator/
 │   └── mission-executor.codex.md     # Codex adapter (spec, deferred)
 ├── scripts/
 │   ├── classify-mission.js         # deterministic mission-class guard
+│   ├── mailbridge.py               # §12 email transport (proven plaid-finance channel, standalone)
+│   ├── mission_mailbox.py          # report/walkthrough/proposal out; poll + route feedback in
 │   └── deploy.ps1 / deploy.sh      # install operative files into ~/.claude
 └── proposals/                      # /evolve amendment drafts awaiting grant
 ```
@@ -133,6 +135,12 @@ The reference executor (`mission-executor.workflow.js`) implements: the wave-bas
 close-time binding, the micro-loop retry, the actor→critic→adjudicate gate, mission-class–scaled
 audit, the operating-card split, the cold-improver→revision loop, the blast-radius parallelism
 *decision*, and the deterministic class guard.
+
+**The §12 email channel is wired** (`scripts/mailbridge.py` + `scripts/mission_mailbox.py`,
+deployed to `~/.claude/scripts/`): a mission emails REPORT.md / decision walk-throughs / proposals,
+and an authenticated reply is polled (`LMO\MailboxPoll`) and routed into the fieldnotes run-record
+(verdicts) or `/evolve apply` (token-gated grants) — the proven plaid-finance transport, governed
+by the §9 perimeter via a deny-list. Config lives at `~/.claude/mailbridge.env` (machine-local).
 
 **Specified but not yet wired:** subtree replan, the §3.3 gate-critic rebuttal, the
 audit→punchlist→fix loop, the worktree fan-out, and full multi-round cold-reviewer rotation. No

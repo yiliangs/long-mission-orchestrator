@@ -58,11 +58,14 @@ and a predicted effect.
    authority, blocker waiver, verification floors, confidentiality, the perimeter list) is
    flagged **`PERIMETER`** in the batch. It is still emailed, but its grant is explicit and
    per-clause — never bundled into a blanket approval.
-3. **Email (automated).** Send the batch to the Human via the Gmail channel: each proposal with
-   its claim, cited record ids, the exact diff, and predicted effect. Subject carries the
-   `<proposal-id>` and tier. Then **stop** — do not apply.
+3. **Email (automated).** Send each proposal via the deployed §12 channel:
+   `python ~/.claude/scripts/mission_mailbox.py proposal <proposal-id>` — the email carries the
+   claim, cited record ids, the exact diff, and predicted effect, and instructs the Human to reply
+   `GRANT <secret>` to apply. Then **stop** — do not apply.
 4. **Grant (you, async).** You reply or, next session, comment or grant. Partial grants are
-   fine ("take 1 and 3, drop 2").
+   fine ("take 1 and 3, drop 2"). A reply carrying the shared `GRANT_SECRET` is polled by
+   `LMO\MailboxPoll` and triggers step 5 automatically; a reply *without* it is recorded as a
+   comment and applies nothing (the secret is what authorizes a §9 human-only action over email).
 5. **Apply (`/evolve apply <proposal-id>`).** On your grant, apply the granted edits to
    `docs/agent-constitution.md` (or §6.2 cap table), **bump the version**, commit
    (`evolve: constitution vX.Y -> vX.Z`), run `scripts/deploy`, and confirm by email. The
