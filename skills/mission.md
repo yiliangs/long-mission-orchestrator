@@ -114,6 +114,18 @@ lenses: feasibility, completeness, dependency-correctness, scope, **verification
 under-provisioning). Severity + triangulated adjudication per §3.3 — actor gets one rebuttal
 per finding, you (orchestrator) rule. Blockers must cite. Do **not** loop to consensus.
 
+**Provision each critic frugally (§6.4 cost) — FIGHT critics are spawned by you, the
+orchestrator, so the operating-card discipline the executor applies does NOT reach them
+automatically; apply it here by hand.** Hand each critic the **operating card**
+(`~/.claude/docs/operating-card.md`), *not* the 36 KB constitution. Pin the artifacts to read —
+`plan.json` + `brief.md` only — and **bound repo exploration to a spot-check budget**: read only
+the specific paths a node's `write_set`/instruction names, read-only, to test a *specific*
+premise; trust declared paths unless a concrete claim needs checking. Do **not** instruct a
+critic to "explore the repo" open-endedly. A fan-out of N critics each free-crawling a large
+repo and re-reading full governance is the dominant FIGHT-phase cost (the natalie-fable-revision
+run: every round-2 critic re-read the full constitution + 36 KB plan + 12 KB brief + crawled the
+worktree, and the mission fought twice — a multi-million-token bill before EXECUTE even began).
+
 **Round budget scales with class (§2.4):** M1 → 1 round, lenses scaled to plan size, and
 **early-exit** if the round surfaces no blocker/major. M2 → up to 3 rounds, full lens panel.
 

@@ -19,6 +19,25 @@ version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https:
 - **`/mission` arms at PLAN, not FREEZE** — §11 says arming happens at launch; a session that
   dies grilling or fighting cannot schedule its own resurrection. The arming step now carries the
   concrete `mission_heartbeat.ps1 arm` / `disarm` commands.
+- **FIGHT-phase critics are now provisioned frugally** (`skills/mission.md` §3) — the operating-card
+  discipline lives in the EXECUTE-phase workflow and never reached the plan-critics `/mission` spawns
+  directly, so they re-read the full 36 KB constitution and free-crawled the repo. They now carry the
+  operating card, read only `plan.json` + `brief.md`, and bound repo exploration to a spot-check
+  budget against the paths a node actually names.
+
+### Fixed
+- **Heartbeat resume loop (`scripts/mission_heartbeat.ps1`) — the §11 "a stale heartbeat survives at
+  most one firing" invariant was described but never implemented.** The only guard
+  (`heartbeat.spawning`) is removed in `finally`, so it blocked concurrent resumes but not the 30-min
+  cadence. A mission that died without writing `REPORT.md` (so it never self-disarmed) re-fired
+  `claude --resume` every 30 min — observed **23 times overnight on `natalie-fable-revision-20260609`**,
+  staleness climbing 59→599 min with zero progress, each beat cold-reloading the full session
+  transcript (~400 K tokens). Fix: a resume ledger (`heartbeat.resumes.json`) + `-MaxResumes` cap
+  (default 3) + a no-progress check (if the prior resume failed to advance mission activity, stop);
+  on give-up the beat self-disarms and writes a `heartbeat.dead` marker (a §12 dead-and-unrecoverable
+  alarm) instead of looping. The activity scan now excludes the heartbeat's own bookkeeping files so a
+  beat can't mistake its own writes for progress; `arm` clears stale ledgers so a deliberate re-arm
+  still works.
 
 ## [0.2] — 2026-06-09
 

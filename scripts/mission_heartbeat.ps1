@@ -21,6 +21,7 @@ param(
     [string]$Lock,
     [int]$IntervalMin = 30,   # beat cadence
     [int]$StaleMin = 45,      # no activity for this long => the run is presumed dead
+    [int]$MaxResumes = 3,     # §11 backstop: total resume attempts before the beat gives up + disarms
     [switch]$DryRun           # beat: log the resume decision but do not launch claude
 )
 $ErrorActionPreference = 'Stop'
@@ -81,6 +82,11 @@ switch ($Action) {
         }
         $cfg | ConvertTo-Json | Set-Content -Path $lockPath -Encoding UTF8
 
+        # Fresh start: clear any resume ledger / dead marker left by a prior arming of this run,
+        # so a deliberate re-arm (e.g. after the human resolves the usage window) is not instantly
+        # disarmed by a spent budget from last time.
+        Remove-Item (Join-Path $RunDir 'heartbeat.resumes.json'), (Join-Path $RunDir 'heartbeat.dead') -ErrorAction SilentlyContinue
+
         # Per-run beat wrapper (hard-coded lock path) so run_hidden.vbs needs no arg plumbing.
         $cmdPath = Join-Path $ScriptsDir "heartbeat-$runId.cmd"
         @"
@@ -123,14 +129,48 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         }
 
         # Activity check: newest touch across the run dir and this repo's mission transcripts.
+        # EXCLUDE the heartbeat's own bookkeeping -- counting our own writes as "activity" would
+        # let a beat mistake its own footprint for mission progress and resume forever.
+        $bookkeeping = @('mission.lock', 'heartbeat.spawning', 'heartbeat.resumes.json', 'heartbeat.dead')
         $transcripts = @(Find-Transcripts $cfg)
         $newest = (Get-Item $Lock).LastWriteTime
         Get-ChildItem $cfg.run_dir -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $bookkeeping -notcontains $_.Name } |
             ForEach-Object { if ($_.LastWriteTime -gt $newest) { $newest = $_.LastWriteTime } }
         if ($transcripts.Count -gt 0 -and $transcripts[0].LastWriteTime -gt $newest) { $newest = $transcripts[0].LastWriteTime }
         $idleMin = [int]((Get-Date) - $newest).TotalMinutes
         if ($idleMin -lt $cfg.stale_min) {
             Log "BEAT  $runId  active (last touch ${idleMin}min ago < $($cfg.stale_min)) -> exit"
+            exit 0
+        }
+
+        # §11 invariant -- "a stale heartbeat survives at most one firing." A resume that produced
+        # NO new mission activity is a DEAD resume; re-firing it every interval just burns the usage
+        # window (observed: 23 firings on natalie-fable-revision-20260609, staleness 59->599 min,
+        # zero progress, ~400K cold tokens per beat). So before resuming again: if the previous
+        # resume failed to advance $newest, or the total resume budget is spent, DISARM and leave a
+        # heartbeat.dead marker for the morning report -- a dead-and-unrecoverable run is a §12 alarm,
+        # not something to retry into the ground.
+        $ledgerPath = Join-Path $cfg.run_dir 'heartbeat.resumes.json'
+        $ledger = if (Test-Path $ledgerPath) { Get-Content $ledgerPath -Raw | ConvertFrom-Json }
+                  else { [pscustomobject]@{ attempts = 0; resumed_from = '' } }
+        $attempts = [int]$ledger.attempts
+        $deadReason = $null
+        if ($attempts -ge $MaxResumes) {
+            $deadReason = "resume budget exhausted ($attempts/$MaxResumes attempts)"
+        }
+        elseif ($attempts -ge 1 -and $ledger.resumed_from -and ([datetime]$ledger.resumed_from -ge $newest)) {
+            $deadReason = "prior resume made no progress (stale ${idleMin}min, no advance since attempt $attempts)"
+        }
+        if ($deadReason) {
+            $deadMsg = "Mission $runId presumed dead and unrecoverable by heartbeat: $deadReason. " +
+                "A human must inspect the run dir ($($cfg.run_dir)) and resume or close it."
+            if (-not $DryRun) { Set-Content -Path (Join-Path $cfg.run_dir 'heartbeat.dead') -Value $deadMsg -Encoding UTF8 }
+            Log "BEAT  $runId  $deadReason -> self-disarm + escalate (heartbeat.dead)$(if ($DryRun) {' [DRY-RUN]'})"
+            if (-not $DryRun) {
+                try { schtasks /Delete /F /TN $taskName 2>$null | Out-Null } catch { }
+                Remove-Item (Join-Path $ScriptsDir "heartbeat-$runId.cmd") -ErrorAction SilentlyContinue
+            }
             exit 0
         }
 
@@ -141,6 +181,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             exit 0
         }
         Get-Date -Format 'o' | Set-Content -Path $spawnLock
+
+        # Record this resume in the ledger BEFORE launching: the next beat compares $newest against
+        # resumed_from to decide whether this attempt actually moved the mission (above).
+        if (-not $DryRun) {
+            [pscustomobject]@{
+                attempts     = ($attempts + 1)
+                resumed_from = $newest.ToString('o')
+                last_resume  = (Get-Date -Format 'o')
+            } | ConvertTo-Json | Set-Content -Path $ledgerPath -Encoding UTF8
+        }
 
         $prompt = "[heartbeat] Constitution section 11 idempotent resume beat for mission run $($cfg.run_id). " +
             "Run dir: $($cfg.run_dir). A prior orchestrator session appears dead (no activity for ${idleMin} min " +
@@ -186,7 +236,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         Remove-Item (Join-Path $ScriptsDir "heartbeat-$runId.cmd") -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'mission.lock') -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'heartbeat.spawning') -ErrorAction SilentlyContinue
-        Log "DISARM $runId  task + lock removed"
+        Remove-Item (Join-Path $RunDir 'heartbeat.resumes.json') -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $RunDir 'heartbeat.dead') -ErrorAction SilentlyContinue
+        Log "DISARM $runId  task + lock + ledger removed"
     }
 
     'status' {
