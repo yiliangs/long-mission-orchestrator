@@ -123,9 +123,19 @@ on an `agent/mission-<slug>` branch. **Go-gate scales with class (§2.4):** in *
 mode show the frozen plan and wait for go — **except M0, which proceeds on freeze** (an errand
 does not earn a gate). In unattended/queued, proceed on freeze at every class.
 
-**Arm the heartbeat (constitution §11) for M1/M2** — before execution, so a token-dead session
-can still be resumed; write the marker `<repo>/.mission/<run-id>/mission.lock`. **M0 skips the
-heartbeat** (a ≤2-node errand is cheaper to restart than to checkpoint).
+**Arm the heartbeat (constitution §11) for M1/M2** — as soon as `.mission/<run-id>/` exists
+at PLAN, **not** here at freeze: §11 requires arming at launch, because a session that dies
+grilling or fighting cannot schedule its own resurrection (the natalie-fable-revision run died
+exactly there — usage limit mid-PLAN, no heartbeat armed, recovery was manual). Arm with:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/scripts/mission_heartbeat.ps1 arm -RunDir <repo>/.mission/<run-id>
+```
+
+This writes the `mission.lock` marker and registers `LMO\Heartbeat-<run-id>` (every 30 min;
+each beat is idempotent per §11: active → exit, dead → headless resume from committed state,
+complete/absent → self-disarm). **M0 skips the heartbeat** (a ≤2-node errand is cheaper to
+restart than to checkpoint).
 
 > **Autonomy-gate note (perimeter-safe).** The executor dispatches via the Workflow tool,
 > which carries its own harness permission prompt — this fires regardless of `mission_class`
@@ -174,8 +184,9 @@ Then **deliver**:
 - **Push** the verdict line (notification). **Email** REPORT.md via the deployed §12 channel:
   `python ~/.claude/scripts/mission_mailbox.py report <run-id>` (mints a reply-id so the Human's
   reply threads back and is routed by `LMO\MailboxPoll` into the run-record).
-- **Disarm the heartbeat**; leave `.mission/<run-id>/` for review (archived on branch
-  merge).
+- **Disarm the heartbeat**: `powershell -NoProfile -ExecutionPolicy Bypass -File
+  ~/.claude/scripts/mission_heartbeat.ps1 disarm -RunDir <repo>/.mission/<run-id>`; leave
+  `.mission/<run-id>/` for review (archived on branch merge).
 
 ## Hard rules (perimeter — never violate)
 

@@ -3,6 +3,23 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+- **§11 heartbeat plumbing** (`scripts/mission_heartbeat.ps1`) — the constitution described the
+  orchestrator-armed auto-resume abstractly, but no concrete implementation existed; the first M2
+  mission (`natalie-fable-revision-20260609`) died at the usage limit mid-PLAN with nothing armed
+  and had to be resumed by hand. `arm` writes `mission.lock` + registers `LMO\Heartbeat-<run-id>`
+  (per-run scheduled task through `run_hidden.vbs`, every 30 min); each `beat` is idempotent
+  (active → exit; stale ≥45 min → `claude --resume` headless from committed state, queued shape;
+  complete/absent marker → self-disarm); `disarm` removes task + markers. Resume runs under the
+  default permission mode — pre-granting autonomy stays a human settings action.
+
+### Changed
+- **`/mission` arms at PLAN, not FREEZE** — §11 says arming happens at launch; a session that
+  dies grilling or fighting cannot schedule its own resurrection. The arming step now carries the
+  concrete `mission_heartbeat.ps1 arm` / `disarm` commands.
+
 ## [0.2] — 2026-06-09
 
 Right-sizing, cost, verification honesty, and the human-feedback loop. Driven by the first

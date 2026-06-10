@@ -26,7 +26,8 @@ Copy-Item "$repo\skills\mission-log-audit.md"   "$claude\commands\mission-log-au
 Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\mission-executor.workflow.js" -Force
 
 # Deterministic helpers -> scripts/
-Copy-Item "$repo\scripts\classify-mission.js" "$claude\scripts\classify-mission.js" -Force
+Copy-Item "$repo\scripts\classify-mission.js"   "$claude\scripts\classify-mission.js"   -Force
+Copy-Item "$repo\scripts\mission_heartbeat.ps1" "$claude\scripts\mission_heartbeat.ps1" -Force
 
 # Email channel (constitution §12) -> scripts/  (config lives at ~/.claude\mailbridge.env, not synced)
 Copy-Item "$repo\scripts\mailbridge.py"          "$claude\scripts\mailbridge.py"          -Force
