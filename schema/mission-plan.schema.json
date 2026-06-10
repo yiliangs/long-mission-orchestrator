@@ -112,6 +112,14 @@
           "type": "string",
           "description": "One line: why this tier for this node. A plan whose nodes are all one tier must additionally justify the uniformity in the brief; the FREEZE go-gate shows the R-tier histogram."
         },
+        "model_tier": {
+          "enum": ["haiku", "sonnet", "opus"],
+          "description": "Compute tier for this node's ACTOR side — actor/retry/revise (§3.6). Model intelligence tracks stake of judgement. Gating critics, cold verifier, and AUDIT are always Opus regardless of this field. Floors couple to V-class: V0/V1 actor floor Sonnet (the binding closure record defines correctness), V2/V3 and final-deliverable actor floor Opus. Planner may RAISE toward Opus; the executor rounds any below-floor request UP and logs it. Haiku is opt-in — honored only on a V0/V1 actor node carrying model_rationale that asserts information-preserving transport (extract/reformat/down-sample), never generation. Absent = executor uses the role floor."
+        },
+        "model_rationale": {
+          "type": "string",
+          "description": "One line: why this compute tier (§3.6). REQUIRED to drop a V0/V1 actor to Haiku. The FREEZE go-gate shows the model histogram beside the R-tier histogram."
+        },
         "acceptance_criteria": {
           "type": "array",
           "minItems": 1,

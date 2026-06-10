@@ -107,6 +107,44 @@ function effectiveTier(node, selfClosed) {
   return floor
 }
 
+// ── Compute tier (§3.6): model intelligence tracks stake of judgement ─────────
+// The strongest model is the default; a weaker one is permitted only where a wrong answer has
+// NO UNCAUGHT consequence. Tier is per ROLE, not per node — gates are always Opus (the model is
+// the gate); a V0/V1 actor descends (the binding check, not the model, defines correctness); the
+// advisory improver descends (the gate that follows it catches a bad suggestion). Haiku is opt-in
+// with a rationale, never derived. When the call is blurry, round UP.
+const _M = { haiku: 0, sonnet: 1, opus: 2 }
+const _MNAME = ['haiku', 'sonnet', 'opus']
+
+// Lowest tier permitted for the ACTOR side (actor / retry / revise) of a node.
+function actorModelFloor(node) {
+  if (node.is_final_deliverable) return 'opus'                       // outward, last line
+  if (node.v_class === 'V2' || node.v_class === 'V3') return 'opus'  // §2.3: correctness exceeds any check
+  return 'sonnet'                                                    // V0/V1 binding closure record (§2.1) is the gate
+}
+// Resolve the actor model: planner may raise toward Opus, never below the floor. Haiku honored
+// ONLY on a Sonnet-floor (V0/V1) node carrying an explicit rationale (§3.6 opt-in); else round up.
+function actorModel(node) {
+  const floor = actorModelFloor(node)
+  const req = node.model_tier
+  if (!req || _M[req] == null) return floor
+  if (_M[req] >= _M[floor]) return req                              // at/above floor (e.g. Opus on a V0 node)
+  if (req === 'haiku' && floor === 'sonnet' && node.model_rationale) return 'haiku'  // justified pure-transport
+  log(`⚠ Node ${node.id}: model_tier ${req} below floor ${floor}` +
+    `${req === 'haiku' ? ' (Haiku needs model_rationale on a V0/V1 actor)' : ''} — rounded up to ${floor} (§3.6).`)
+  return floor
+}
+// A failed V0/V1 close rounds the retry up one tier — the cheap model could not satisfy the
+// binding check, which is the signal to spend more (§3.6 round-up at the retry edge).
+function retryModel(base, tries) { return _MNAME[Math.min(_M.opus, _M[base] + tries)] }
+
+// Planned actor-tier histogram for the go-gate + run-record (§3.6/§7). Gates are Opus by rule.
+function modelReport() {
+  const actor_tier_histogram = {}
+  for (const n of plan.nodes) { const m = actorModel(n); actor_tier_histogram[m] = (actor_tier_histogram[m] || 0) + 1 }
+  return { actor_tier_histogram, gates: 'opus (§3.6)' }
+}
+
 // ── Structured-output schemas ────────────────────────────────────────────────
 
 const ACTOR_SCHEMA = {
@@ -354,8 +392,9 @@ function isReady(node, doneSet) {
 async function runNode(node) {
   if (completed[node.id]) return completed[node.id]
 
+  const aModel = actorModel(node)   // compute tier for this node's actor side (§3.6)
   let actor = await spawn(actorPrompt(node), {
-    label: `actor:${node.id}`, phase: 'Execute', schema: ACTOR_SCHEMA,
+    label: `actor:${node.id}@${aModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: aModel,
   })
   if (!actor) return { node: node.id, status: 'lost', reason: 'actor died' }
 
@@ -368,9 +407,10 @@ async function runNode(node) {
   let tries = 0
   while (actor.outcome === 'failed' && tries < capFor(node, 'micro_loop_retries')) {
     tries++
+    const rModel = retryModel(aModel, tries)   // round up one tier per failed close (§3.6)
     actor = await spawn(
       `${actorPrompt(node)}\n\nPRIOR ATTEMPT FAILED: ${actor.notes || ''}. Retry (attempt ${tries + 1}).`,
-      { label: `actor:${node.id}:retry${tries}`, phase: 'Execute', schema: ACTOR_SCHEMA },
+      { label: `actor:${node.id}:retry${tries}@${rModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: rModel },
     )
     if (!actor) return { node: node.id, status: 'lost', reason: 'actor died on retry' }
     if (actor.outcome === 'plan_assumption_false')
@@ -388,12 +428,14 @@ async function runNode(node) {
     (MCLASS === 'M2' ? node.improve_pass !== false : node.improve_pass === true) &&
     !budgetExhausted()   // advisory pass, first thing shed under budget pressure (§6.4)
   if (actor.outcome === 'done' && improverOn) {
+    // Improver is advisory and backstopped by the gate that follows it (§3.6) → Sonnet floor.
     const improver = await spawn(improverPrompt(node, actor.artifact_summary),
-      { label: `improver:${node.id}`, phase: 'Execute', schema: CRITIC_SCHEMA })
+      { label: `improver:${node.id}@sonnet`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'sonnet' })
     const suggestions = (improver && improver.findings) || []
     if (suggestions.length > 0) {
+      // Revise re-runs the actor → same compute tier as the node's actor side.
       const revised = await spawn(reviseActorPrompt(node, suggestions),
-        { label: `actor:${node.id}:revise`, phase: 'Execute', schema: ACTOR_SCHEMA })
+        { label: `actor:${node.id}:revise@${aModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: aModel })
       if (revised) {
         if (revised.outcome === 'plan_assumption_false')
           return { node: node.id, status: 'replan', reason: revised.replan_reason, actor: revised }
@@ -423,7 +465,8 @@ async function runNode(node) {
   const lenses = tier === 'R3' ? ['correctness', 'completeness'] : [null]
   const findingSets = await parallel(lenses.map(lens => () =>
     spawn(tier === 'R1' ? r1CriticPrompt(node, actor) : r2CriticPrompt(node, actor, lens),
-      { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA })))
+      // Gating critic — the model IS the gate, always Opus (§3.6).
+      { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
 
   const verdict = adjudicate(findingSets)
 
@@ -435,7 +478,8 @@ async function runNode(node) {
   const candidateClean = verdict.blockers.length === 0 && verdict.majors.length === 0
   if (node.is_final_deliverable && candidateClean && capFor(node, 'cold_swaps') > 0) {
     const cold = await spawn(coldCriticPrompt(node, actor.artifact_summary),
-      { label: `critic:${node.id}:cold`, phase: 'Execute', schema: CRITIC_SCHEMA })
+      // Cold verifier on the final deliverable — a gate, always Opus (§3.6).
+      { label: `critic:${node.id}:cold`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })
     coldConfirmed = true
     if (cold) {
       const c = adjudicate([cold])              // new findings ⇒ the green was stale
@@ -459,6 +503,8 @@ log(`Mission ${plan.run_id} — ${plan.nodes.length} nodes, mode=${MODE}, class=
   (TOKEN_BUDGET || AGENT_BUDGET ? `, budget=${TOKEN_BUDGET || '∞'}tok/${AGENT_BUDGET || '∞'}agents` : ''))
 if (MCLASS !== _claimedClass)
   log(`⚠ Mission class floored ${_claimedClass} → ${MCLASS} (§2.4 backstop): plan under-classified vs deterministic floor.`)
+const _mh = modelReport().actor_tier_histogram
+log(`Compute tiers (§3.6) — actors: ${Object.entries(_mh).map(([k, v]) => `${v}×${k}`).join(', ') || 'none'}; all gates Opus.`)
 
 const doneSet = new Set(Object.keys(completed))
 const results = { ...completed }
@@ -551,6 +597,7 @@ if (MCLASS === 'M0') {
     punchlist: [],
     ledger,
     budget: budgetReport(),
+    compute_tiers: modelReport(),
     node_results: results,
   }
 }
@@ -578,7 +625,8 @@ ${budgetDiverged ? `BUDGET EXHAUSTED mid-mission (§6.4): unopened nodes ${JSON.
 ${recheckInstruction} Assemble the punchlist (each item is a candidate new node) and the
 defect ledger (majors accepted-with-reason + minors + unreached criteria). Verdict DELIVERED
 unless the mission diverged (§6.3) or an unwaived blocker remains.`,
-  { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA })
+  // AUDIT judges the whole mission — always Opus (§3.6).
+  { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA, model: 'opus' })
 
 return {
   run_id: plan.run_id,
@@ -591,5 +639,6 @@ return {
   punchlist: audit ? audit.punchlist : [],
   ledger: audit ? audit.ledger : [],
   budget: budgetReport(),
+  compute_tiers: modelReport(),
   node_results: results,
 }

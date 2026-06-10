@@ -3,6 +3,44 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.1] — 2026-06-10
+
+Compute tier as the third frozen dial, and a sharper heartbeat futility signal. Both fall out
+of the same principle the project keeps re-deriving: **a cost-reducing choice is only safe where
+a wrong answer has no uncaught consequence — and when it's blurry, round up.**
+
+### Added
+- **Compute tier R-tier sibling (§3.6)** — model intelligence tracks stake of judgement, a
+  per-node `model_tier` (+ `model_rationale`) frozen in `plan.json` beside V-class and R-tier.
+  The strongest model is the default; a weaker one is permitted only where the wrong answer is
+  caught downstream. Floors are assigned **per role**, derived from V-class: every gating critic,
+  the cold verifier, AUDIT, and the final-deliverable actor are **always Opus** (the model *is*
+  the gate); a **V0/V1 actor floors at Sonnet** (the binding closure record, not the model,
+  defines correctness); the advisory improver floors at Sonnet (backstopped by the gate that
+  follows it). **Haiku is opt-in, never derived** — a V0/V1 actor drops to it only with a
+  rationale asserting information-preserving transport. A **failed V0/V1 close rounds the retry
+  up one tier**. The executor floors any below-floor request up and logs it; FREEZE shows the
+  model histogram beside the R-tier histogram; `compute_tiers` lands in the run-record for
+  escape-rate calibration (§7). Economically self-placing: gates are the minority of spawns,
+  descent-eligible actors are the mass, so Opus lands on stake and the savings land elsewhere.
+
+### Changed
+- **Constitution 0.3 → 0.3.1** — new §3.6; the model-tier dial threaded through `/mission`
+  (PLAN node fields, the go-gate model histogram, run-record telemetry).
+- **Plan schema** — adds node-level `model_tier` + `model_rationale` (additive; absent ⇒ executor
+  uses the role floor, so 0.3 plans run unchanged).
+
+### Fixed
+- **Heartbeat futility detector keyed off transcript noise (`scripts/mission_heartbeat.ps1`).**
+  The 0.3 one-futile-resume cap compared progress against `$newest`, which folded in the session
+  transcript's mtime — but a resumed `claude` dirties its transcript just by loading and echoing
+  the prompt, even when it makes zero mission progress. So an unproductive-but-churning resume
+  looked like progress and slipped past the cap to the RunawayStop=20 backstop (the cousin of the
+  original 23-firing loop). Split the signal: `$artifactMark` (run-dir artifacts minus
+  bookkeeping, **transcript excluded**) now drives futility; `$newest` (incl. transcript) still
+  drives staleness. The exact observed failure stays capped at one futile resume, and the churn
+  cousin now trips the same cap. Parse-clean.
+
 ## [0.3] — 2026-06-10
 
 Token frugality as a design principle, review depth as a dial, and recovery plumbing separated

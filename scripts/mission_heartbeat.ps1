@@ -133,15 +133,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             exit 0
         }
 
-        # Activity check: newest touch across the run dir and this repo's mission transcripts.
-        # EXCLUDE the heartbeat's own bookkeeping -- counting our own writes as "activity" would
-        # let a beat mistake its own footprint for mission progress and resume forever.
+        # Two DISTINCT signals, deliberately not the same timestamp:
+        #
+        #   $artifactMark -- newest MISSION-PROGRESS write: run-dir artifacts (journal, plan.json,
+        #     partial outputs) MINUS the heartbeat's own bookkeeping. This is the FUTILITY signal.
+        #     It EXCLUDES the session transcript on purpose: a resumed `claude` dirties its transcript
+        #     jsonl just by loading and echoing the prompt -- even when it bounces off the usage limit
+        #     and produces zero mission progress. Folding the transcript in here would let an
+        #     unproductive resume masquerade as progress and slip past the one-futile-resume cap (the
+        #     RunawayStop=20 cousin of the original 23-firing loop). Real work touches the run dir
+        #     (the canonical section-11 recovery state), so a productive resume still advances this.
+        #
+        #   $newest -- newest activity of ANY kind, transcript included. This is the STALENESS signal:
+        #     a live session actively driving the run keeps its transcript warm, so idle detection
+        #     SHOULD see it (otherwise we'd resume on top of a working session).
         $bookkeeping = @('mission.lock', 'heartbeat.spawning', 'heartbeat.resumes.json', 'heartbeat.dead')
         $transcripts = @(Find-Transcripts $cfg)
-        $newest = (Get-Item $Lock).LastWriteTime
+        $artifactMark = (Get-Item $Lock).LastWriteTime
         Get-ChildItem $cfg.run_dir -Recurse -File -ErrorAction SilentlyContinue |
             Where-Object { $bookkeeping -notcontains $_.Name } |
-            ForEach-Object { if ($_.LastWriteTime -gt $newest) { $newest = $_.LastWriteTime } }
+            ForEach-Object { if ($_.LastWriteTime -gt $artifactMark) { $artifactMark = $_.LastWriteTime } }
+        $newest = $artifactMark
         if ($transcripts.Count -gt 0 -and $transcripts[0].LastWriteTime -gt $newest) { $newest = $transcripts[0].LastWriteTime }
         $idleMin = [int]((Get-Date) - $newest).TotalMinutes
         if ($idleMin -lt $cfg.stale_min) {
@@ -152,19 +164,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         # Section-11 invariant -- "a stale heartbeat survives at most one FUTILE firing." Resume is
         # recovery plumbing: a mission that spans N usage windows legitimately resumes N times, so
         # recovery resumes are UNCOUNTED. The only thing this ledger detects is FUTILITY -- a resume
-        # that produced no new mission activity is a dead resume, and re-firing it every interval
-        # just burns the usage window (observed: 23 firings on natalie-fable-revision-20260609,
-        # staleness 59->599 min, zero progress, ~400K cold tokens per beat). One futile resume =>
-        # DISARM + heartbeat.dead marker for the morning report -- a dead-and-unrecoverable run is a
-        # section-12 alarm, not something to retry into the ground. Work thoroughness (actor-critic
-        # rounds, ladder caps) is the EXECUTOR's job (section 6.2), never this script's.
+        # that produced no new mission ARTIFACT (not just transcript noise) is a dead resume, and
+        # re-firing it every interval just burns the usage window (observed: 23 firings on
+        # natalie-fable-revision-20260609, staleness 59->599 min, zero progress, ~400K cold tokens
+        # per beat). Futility is measured against $artifactMark, NOT $newest -- a resume that loaded,
+        # echoed, and died touches only the transcript, which $artifactMark excludes by design. One
+        # futile resume => DISARM + heartbeat.dead marker for the morning report -- a
+        # dead-and-unrecoverable run is a section-12 alarm, not something to retry into the ground.
+        # Work thoroughness (actor-critic rounds, ladder caps) is the EXECUTOR's job (section 6.2).
         $ledgerPath = Join-Path $cfg.run_dir 'heartbeat.resumes.json'
         $ledger = if (Test-Path $ledgerPath) { Get-Content $ledgerPath -Raw | ConvertFrom-Json }
                   else { [pscustomobject]@{ resumes = 0; resumed_from = '' } }
         $resumes = [int]$ledger.resumes
         $deadReason = $null
-        if ($resumes -ge 1 -and $ledger.resumed_from -and ([datetime]$ledger.resumed_from -ge $newest)) {
-            $deadReason = "prior resume made no progress (stale ${idleMin}min, no advance after resume $resumes)"
+        if ($resumes -ge 1 -and $ledger.resumed_from -and ([datetime]$ledger.resumed_from -ge $artifactMark)) {
+            $deadReason = "prior resume produced no mission artifact (stale ${idleMin}min, artifact mark did not advance after resume $resumes)"
         }
         elseif ($resumes -ge $RunawayStop) {
             $deadReason = "runaway stop ($resumes resumes) -- progress detector is being fooled; human inspection required"
@@ -189,12 +203,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         }
         Get-Date -Format 'o' | Set-Content -Path $spawnLock
 
-        # Record this resume in the ledger BEFORE launching: the next beat compares $newest against
-        # resumed_from to decide whether this resume actually moved the mission (above).
+        # Record this resume in the ledger BEFORE launching: the next beat compares $artifactMark
+        # against resumed_from to decide whether this resume actually moved a mission artifact (above).
+        # We stamp the PRE-resume artifact mark so "no advance" means "no new run-dir artifact since
+        # we fired" -- transcript churn from the resume itself cannot satisfy it.
         if (-not $DryRun) {
             [pscustomobject]@{
                 resumes      = ($resumes + 1)
-                resumed_from = $newest.ToString('o')
+                resumed_from = $artifactMark.ToString('o')
                 last_resume  = (Get-Date -Format 'o')
             } | ConvertTo-Json | Set-Content -Path $ledgerPath -Encoding UTF8
         }

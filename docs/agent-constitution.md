@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3
+**Version:** 0.3.1
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -277,6 +277,44 @@ verification gate; it **never closes** the gate or substitutes for a machine che
 critic, or a human. The revision loop can only improve or no-op — a botched revision is
 discarded, never regressing the node. Scoped by mission class (§2.4): M2 on by default for a-c
 implementation nodes, M1 opt-in on the riskiest, M0 never.
+
+### 3.6 Compute tier (model intelligence tracks stake of judgement)
+
+The **strongest model is the default**; a weaker one is permitted only where a wrong answer
+has **no uncaught consequence**. Tier is assigned per **role**, not per node — an actor and its
+critic on the same node carry different stakes — and it is the third dial beside V-class and
+R-tier, frozen in `plan.json` at PLAN.
+
+| Role / node property | Why | Tier floor |
+|---|---|---|
+| Any gating critic (R1–R3), cold verifier (§3.4) | the model **is** the gate — its wrong answer is the consequence | **Opus** |
+| Planner; AUDIT; subtree-replan reasoning | judges the whole mission | **Opus** |
+| Final-deliverable actor | outward, last line, residual uncaught | **Opus** |
+| V2/V3 actor | §2.3 — correctness exceeds any single check | **Opus** |
+| **V0/V1 actor** (binding closure record, §2.1) | the **check** defines correctness; a wrong answer fails it | **Sonnet** |
+| Cold improver (§3.5) / advisory pass | discarded unless the gate passes it — backstopped | **Sonnet** |
+
+**The master test is consequence, not effort.** A role that exercises judgement but whose every
+wrong answer is *caught downstream* descends (the improver is caught by the gate that follows it;
+a V0/V1 actor is caught by its binding check). A role whose wrong answer is *itself* the
+consequence — any gate — does not. The cost case is favourable by construction: gates are the
+**minority** of spawns and the descent-eligible actors are the **mass**, so Opus lands where the
+stake is and the savings land where it isn't.
+
+**When it is unclear, blurry, or hard to call — round up.** This is the standing tie-breaker, the
+same asymmetry as V-class and M-class: cheapness is never the default a doubt resolves toward.
+
+**Haiku is opt-in, never derived.** No floor is Haiku. A V0/V1 actor drops to Haiku only when the
+planner sets `model_tier: "haiku"` **with** a one-line `model_rationale` asserting the node is
+information-preserving transport (extract / reformat / down-sample), never generation. The
+executor floors any other below-floor request **up** (to Sonnet or Opus) and logs it.
+
+**Floors couple model to V — the §3.1 machine, a third output.** The planner may raise toward
+Opus freely; never below the role floor. A **failed V0/V1 close rounds the retry up one tier** —
+the cheap model could not satisfy the binding check, which is precisely the signal to spend more.
+FREEZE shows the model histogram beside the R-tier histogram; §7 escape-rate telemetry validates
+each tier on evidence, so a cheap tier that leaks defects past its gate tightens on the next
+calibration, not on vibes. **Discretion above the floor; never below it.**
 
 ---
 

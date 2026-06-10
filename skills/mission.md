@@ -79,6 +79,11 @@ V0/V1-closed nodes may take R0, V2 nodes take ≥R2, final deliverable R3; above
 choose freely, one line of rationale each; an all-one-tier plan must justify the uniformity
 in the brief), `acceptance_criteria` (named, citable), caps (only if overriding defaults,
 with reason), `compute_role_required`. Leave `check` as TBD — it binds at close time.
+Optionally set `model_tier` + `model_rationale` (§3.6 — model intelligence tracks stake of
+judgement): leave it absent and the executor uses the role floor (gates Opus; V0/V1 actors
+Sonnet); raise toward Opus where a V0/V1 node's judgement is subtler than its check; drop a
+V0/V1 actor to Haiku **only** with a rationale asserting pure transport (extract/reformat/
+down-sample). When the call is blurry, leave it absent and let the floor round you up.
 
 **Propose the mission budget (§6.4).** For M1/M2, set mission-level `token_budget`
 (executor-observable output tokens) and `agent_budget` (total spawns) — start from class
@@ -145,9 +150,11 @@ on an `agent/mission-<slug>` branch. **Go-gate scales with class (§2.4):** in *
 mode show the frozen plan and wait for go — **except M0, which proceeds on freeze** (an errand
 does not earn a gate). In unattended/queued, proceed on freeze at every class.
 
-**The go-gate display includes the cost contract:** the `token_budget` / `agent_budget` pair
-and the **R-tier histogram** (how many nodes at R0/R1/R2/R3, with the floor-driven minimums
-marked) — an all-R0 cheap-out or all-R3 gold-plate should be one glance to catch before go.
+**The go-gate display includes the cost contract:** the `token_budget` / `agent_budget` pair,
+the **R-tier histogram** (how many nodes at R0/R1/R2/R3, with the floor-driven minimums
+marked), and the **model histogram** (actor tiers Haiku/Sonnet/Opus, gates always Opus; §3.6) —
+an all-R0 cheap-out, an all-R3 gold-plate, or a Haiku creeping onto a generative node should
+each be one glance to catch before go.
 
 **Arm the heartbeat (constitution §11) for M1/M2** — as soon as `.mission/<run-id>/` exists
 at PLAN, **not** here at freeze: §11 requires arming at launch, because a session that dies
@@ -212,10 +219,11 @@ Then **deliver**:
   classes. Leave the hindsight verdicts **null** — AUDIT fills any machine-check verdicts
   (`evidence_source:"machine_check"`), `/mission-log-audit` fills the human-diff verdicts. A critic
   opinion may write a verdict but **never** `may_lower:true` (§2.2 / schema).
-- Record **budget planned-vs-actual** (token + agent counts from the executor's return) and
-  **per-node R-tier escape outcomes** (did AUDIT/punchlist catch a defect the node's review
-  tier missed?) in the run-record — this is the telemetry that calibrates class budget
-  defaults and the V→R floor table (§7).
+- Record **budget planned-vs-actual** (token + agent counts from the executor's return), the
+  **compute-tier histogram** (`compute_tiers` from the executor's return), and **per-node
+  R-tier escape outcomes** (did AUDIT/punchlist catch a defect the node's review tier missed?)
+  in the run-record — this is the telemetry that calibrates class budget defaults, the V→R floor
+  table, and the §3.6 model floors (a cheap tier that leaks defects past its gate tightens) (§7).
 - Append cap stats to `mission-caps.jsonl` (fieldnotes).
 - **Push** the verdict line (notification). **Email** REPORT.md via the deployed §12 channel:
   `python ~/.claude/scripts/mission_mailbox.py report <run-id>` (mints a reply-id so the Human's
