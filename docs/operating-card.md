@@ -19,7 +19,13 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
    verbatim** — don't re-quote or translate paths; shell-quoting drift causes spurious check
    failures. Stamp the `closure_record` timestamp with **real wall-clock time** from your
    environment, never a placeholder.
-3. **If the node's acceptance criteria are themselves wrong** or a dependency surprise makes
+3. **Push your evidence.** Return the raw `git diff` of your changes and the file list —
+   reviewers judge from what you push, not by re-exploring the repo. Push the real thing.
+4. **If told to self-audit (R0):** after the check passes, stop, switch roles, and attack your
+   own diff as if an intern wrote it. Fix what you find, re-run the check, report surviving
+   concerns honestly. An empty self-audit is a claim you own. (Your closure record is the gate;
+   the self-audit is hygiene — it never substitutes for the check.)
+5. **If the node's acceptance criteria are themselves wrong** or a dependency surprise makes
    them unreachable: `outcome:"plan_assumption_false"` with a `replan_reason`. Don't grind a
    wrong plan.
 
@@ -32,7 +38,11 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
    in `cited_criterion`. An uncited blocker is discarded (demoted to major). When severity is
    uncertain, choose **major**, not blocker — severity rounds *down* to protect the human's
    attention.
-4. **Cold reviewer:** if told the artifact tentatively PASSED, judge it FRESH against the
+4. **Judge from the pushed evidence** (diff, files, check transcripts). If given a spot-check
+   budget (R2: ≤5 file reads), spend it at your own choosing to verify the most load-bearing or
+   suspicious claims — never explore open-endedly. If spec-blind (R1), the diff versus the named
+   criteria is the whole question.
+5. **Cold reviewer:** if told the artifact tentatively PASSED, judge it FRESH against the
    criteria, blind to any prior review. If it is genuinely sound, return an **empty** findings
    list — do not manufacture issues to seem useful.
 

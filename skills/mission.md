@@ -74,8 +74,18 @@ Draft a DAG conforming to `~/.claude/docs/mission-plan.schema.json`. For each no
 deps, `parallelizable` + `write_set` (the blast radius — globs/namespaces/section-ids it
 mutates; `[]` = read-only, fans out freely; §6.5), `v_class` (round up under uncertainty; honor categorical V2 floors
 §2.2), `ac_required` (true for all V2 / outward-facing / final-deliverable nodes — the
-floors), `acceptance_criteria` (named, citable), caps (only if overriding defaults, with
-reason), `compute_role_required`. Leave `check` as TBD — it binds at close time.
+floors), `review_tier` + `review_rationale` (R0–R3 per §3.1 — the V→R floor table binds:
+V0/V1-closed nodes may take R0, V2 nodes take ≥R2, final deliverable R3; above the floor
+choose freely, one line of rationale each; an all-one-tier plan must justify the uniformity
+in the brief), `acceptance_criteria` (named, citable), caps (only if overriding defaults,
+with reason), `compute_role_required`. Leave `check` as TBD — it binds at close time.
+
+**Propose the mission budget (§6.4).** For M1/M2, set mission-level `token_budget`
+(executor-observable output tokens) and `agent_budget` (total spawns) — start from class
+defaults (M1: 200K/12; M2: 800K/40) adjusted for plan size, and record the reasoning in one
+line. These freeze with the plan, surface at the go-gate, and exhaustion finalizes the
+mission as `DIVERGED(budget)` (§6.3) — they are proxies the run-record calibrates over time,
+not quality levers: a budget narrows scope, it never skips a gate.
 
 **Then classify the mission (§2.4) — by the deterministic classifier, NOT by reasoning.** Write
 the drafted DAG to a `plan.json` and run
@@ -135,6 +145,10 @@ on an `agent/mission-<slug>` branch. **Go-gate scales with class (§2.4):** in *
 mode show the frozen plan and wait for go — **except M0, which proceeds on freeze** (an errand
 does not earn a gate). In unattended/queued, proceed on freeze at every class.
 
+**The go-gate display includes the cost contract:** the `token_budget` / `agent_budget` pair
+and the **R-tier histogram** (how many nodes at R0/R1/R2/R3, with the floor-driven minimums
+marked) — an all-R0 cheap-out or all-R3 gold-plate should be one glance to catch before go.
+
 **Arm the heartbeat (constitution §11) for M1/M2** — as soon as `.mission/<run-id>/` exists
 at PLAN, **not** here at freeze: §11 requires arming at launch, because a session that dies
 grilling or fighting cannot schedule its own resurrection (the natalie-fable-revision run died
@@ -150,11 +164,12 @@ complete/absent → self-disarm). **M0 skips the heartbeat** (a ≤2-node errand
 restart than to checkpoint).
 
 > **Autonomy-gate note (perimeter-safe).** The executor dispatches via the Workflow tool,
-> which carries its own harness permission prompt — this fires regardless of `mission_class`
-> or `mode`, so an `--unattended` overnight run still stalls on it unless the human has
-> pre-granted it in `settings.json`. Pre-granting is a **human settings action**, not an
-> autonomous perimeter relaxation (§9.1); the mission must not weaken it. Surface it as a
-> launch prerequisite for unattended runs, do not route around it.
+> which carries its own harness permission prompt. In a **live session** the human answers it
+> at dispatch — no standing grant needed. For **heartbeat-resumed** sessions (§11), the
+> heartbeat's `claude` command carries a **per-invocation** `--allowedTools "Workflow"` grant,
+> scoped to that single headless invocation and authorized by the human at launch (arming the
+> heartbeat is part of the launch they approve). No `settings.json` pre-grant; the mission
+> must never widen the grant itself (§9.1).
 
 ### 5. EXECUTE
 Dispatch the frozen plan to the executor adapter for this harness:
@@ -168,9 +183,14 @@ Dispatch the frozen plan to the executor adapter for this harness:
 
 The executor walks the DAG: fan out parallelizable ready nodes (worktree isolation for
 concurrent file mutation), run the cold-improver→revision loop (§3.5) on a-c impl nodes,
-critic-gate a-c nodes, climb the problem-solving ladder (§6.1),
-subtree-replan on "plan assumption false". Honor caps (§6.2). Bind and record closure
-records for V0/V1 (§2.1). Finalize on divergence, never on a clock (§6.3).
+review-gate each node at its frozen **R-tier** (§3.1 — R0 two-phase self-audit, R1 spec-blind
+diff, R2 cold-eye + spot-check, R3 panel), climb the problem-solving ladder (§6.1),
+subtree-replan on "plan assumption false". Honor caps (§6.2) and the **mission budget**
+(§6.4): every spawn shares the canonical context pack (byte-identical prefix → cache hits),
+evidence is pushed to reviewers rather than re-explored, and exhausting `token_budget` or
+`agent_budget` finalizes as `DIVERGED(budget)` — no new nodes, in-flight nodes close, never a
+mid-node kill. Bind and record closure records for V0/V1 (§2.1). Finalize on divergence,
+never on a clock (§6.3).
 
 ### 6. AUDIT → DELIVER
 Whole-deliverable review against the plan's own acceptance criteria + constitution. **Depth
@@ -192,6 +212,10 @@ Then **deliver**:
   classes. Leave the hindsight verdicts **null** — AUDIT fills any machine-check verdicts
   (`evidence_source:"machine_check"`), `/mission-log-audit` fills the human-diff verdicts. A critic
   opinion may write a verdict but **never** `may_lower:true` (§2.2 / schema).
+- Record **budget planned-vs-actual** (token + agent counts from the executor's return) and
+  **per-node R-tier escape outcomes** (did AUDIT/punchlist catch a defect the node's review
+  tier missed?) in the run-record — this is the telemetry that calibrates class budget
+  defaults and the V→R floor table (§7).
 - Append cap stats to `mission-caps.jsonl` (fieldnotes).
 - **Push** the verdict line (notification). **Email** REPORT.md via the deployed §12 channel:
   `python ~/.claude/scripts/mission_mailbox.py report <run-id>` (mints a reply-id so the Human's

@@ -1,6 +1,6 @@
 export const meta = {
   name: 'mission-executor',
-  description: 'Claude Code executor adapter: walks a frozen plan.json DAG — fan-out, actor-critic gating, problem-solving ladder, subtree replan — per the agent constitution.',
+  description: 'Claude Code executor adapter: walks a frozen plan.json DAG — fan-out, R-tier review gating, mission budget, problem-solving ladder, subtree replan — per the agent constitution.',
   phases: [
     { title: 'Execute' },
     { title: 'Audit' },
@@ -67,6 +67,46 @@ const DEFAULT_CAPS = {
   cold_swaps: 1,            // §3.4 cold-reviewer rotation; evolution-tuned
 }
 
+// ── Mission budget (§6.4): dual ceiling frozen at PLAN ───────────────────────
+// budget.spent() counts OUTPUT tokens across the turn — an honest proxy; the cumulative
+// cache-read drain is not observable mid-run, which is exactly why the agent ceiling exists:
+// it bounds the fan-out multiplication the token meter cannot see. Exhausting either is a
+// DIVERGENCE (§6.3): no new nodes, in-flight nodes close, AUDIT still runs. Never a mid-node
+// kill, and never a reason to skip a gate or lower a floor.
+const TOKEN_BUDGET = plan.token_budget || null
+const AGENT_BUDGET = plan.agent_budget || null
+const _startSpent = budget.spent()
+let _agentsSpawned = 0
+function tokensUsed() { return budget.spent() - _startSpent }
+function budgetExhausted() {
+  return (TOKEN_BUDGET != null && tokensUsed() >= TOKEN_BUDGET) ||
+         (AGENT_BUDGET != null && _agentsSpawned >= AGENT_BUDGET)
+}
+// Every spawn goes through here so planned-vs-actual lands in the run-record (§7).
+function spawn(prompt, opts) { _agentsSpawned++; return agent(prompt, opts) }
+
+// ── Review tiers (§3.1): V→R floors, planner discretion above ────────────────
+const _R = { R0: 0, R1: 1, R2: 2, R3: 3 }
+function reviewFloor(node, selfClosed) {
+  if (node.is_final_deliverable) return 'R3'
+  const touchesZone = Array.isArray(node.write_set) &&
+    node.write_set.some(w => ZONES.some(z => w === z || w.includes(z) || z.includes(w)))
+  if (node.v_class === 'V2' || node.v_class === 'V3' || touchesZone) return 'R2'
+  if (!selfClosed) return 'R2'      // V0/V1 with no closure record downgrades to V2 (§2.1)
+  return 'R0'                       // the recorded check is the gate; R0 is hygiene on top
+}
+function effectiveTier(node, selfClosed) {
+  let floor = reviewFloor(node, selfClosed)
+  // Legacy compat: ac_required=true with no explicit review_tier keeps its fresh critic.
+  if (!node.review_tier && node.ac_required && _R[floor] < _R.R2) floor = 'R2'
+  const planned = node.review_tier
+  if (planned && _R[planned] != null) {
+    if (_R[planned] >= _R[floor]) return planned
+    log(`⚠ Node ${node.id}: review_tier ${planned} below floor ${floor} — floored (§3.1).`)
+  }
+  return floor
+}
+
 // ── Structured-output schemas ────────────────────────────────────────────────
 
 const ACTOR_SCHEMA = {
@@ -76,6 +116,10 @@ const ACTOR_SCHEMA = {
   properties: {
     outcome: { enum: ['done', 'plan_assumption_false', 'failed'] },
     artifact_summary: { type: 'string' },
+    // Pushed evidence (§6.4 context discipline): reviewers judge from this, not from
+    // re-exploring the repo. The raw diff is what an R1/R2 critic reads in full.
+    diff: { type: ['string', 'null'], description: 'git diff of this node\'s changes on the agent branch (raw, untruncated unless enormous — then the full diff of the most material files + a stat summary).' },
+    files_touched: { type: ['array', 'null'], items: { type: 'string' } },
     // Present only for V0/V1 nodes that self-closed (constitution §2.1).
     closure_record: {
       type: ['object', 'null'],
@@ -86,6 +130,8 @@ const ACTOR_SCHEMA = {
         timestamp: { type: 'string' },
       },
     },
+    // R0 only: surviving concerns from the adversarial self-audit phase (§3.1).
+    self_audit: { type: ['string', 'null'] },
     // Set when outcome === 'plan_assumption_false'.
     replan_reason: { type: ['string', 'null'] },
     notes: { type: ['string', 'null'] },
@@ -130,17 +176,32 @@ const AUDIT_SCHEMA = {
 
 // ── Prompt builders ──────────────────────────────────────────────────────────
 
-// Workers carry the distilled operating card, NOT the full ~26 KB constitution (§6.4): fresh
-// context means re-derived state, not re-read governance. The orchestrator holds the full text;
-// the army carries the card. Falls back to the full constitution only if a rule is ambiguous.
-const govern = `You operate under the mission operating card ~/.claude/docs/operating-card.md ` +
-  `(constitution version ${C}; consult the full ~/.claude/docs/agent-constitution.md only if a ` +
-  `rule is ambiguous). Repo: ${REPO}. Deliverable zones (V2 floor): ${JSON.stringify(ZONES)}.`
+// Canonical context pack (§6.4 cache-prefix discipline). Workers carry the distilled operating
+// card, NOT the full constitution: fresh context means re-derived state, not re-read governance.
+// This block is BYTE-IDENTICAL and sits at the TOP of every spawn's prompt, so every agent after
+// the first hits the prompt cache instead of paying fresh input — "spawn a bunch and each one
+// reads from the start" is the dominant fan-out cost, and this is its antidote. Node-specific
+// material always comes AFTER this shared prefix. Context is pushed, never pulled.
+const govern = `=== MISSION CONTEXT (shared, identical for every agent in this run) ===
+You operate under the mission operating card ~/.claude/docs/operating-card.md (constitution
+version ${C}; consult the full ~/.claude/docs/agent-constitution.md only if a rule is ambiguous).
+Mission ${plan.run_id} (class ${MCLASS}, mode ${MODE}) — goal: ${plan.goal}
+Repo: ${REPO}. Deliverable zones (V2 floor): ${JSON.stringify(ZONES)}.
+Plan: ${plan.nodes.map(n => `[${n.id}] ${n.title} (${n.v_class})`).join(' · ')}
+=== END MISSION CONTEXT ===`
 
 function actorPrompt(node) {
+  // R0 (§3.1): adversarial self-audit rides the actor's own cached context — a second phase in
+  // the SAME conversation, zero re-reading. Permitted as hygiene only where the V0/V1 closure
+  // record is the real gate; if the check doesn't pass, the tier floors to R2 and a fresh
+  // critic fires anyway (effectiveTier).
+  const r0Phase = node.review_tier === 'R0' ? `
+- AFTER the work passes its check: STOP. Switch roles. Re-read your own diff as an adversarial
+  reviewer who assumes it was written by an intern — hunt for what is wrong, fragile, or missed,
+  not for reassurance. Fix what you find, re-run the check, and report any SURVIVING concerns
+  honestly in self_audit (empty self_audit = "I attacked it and found nothing", a claim you own).` : ''
   return `${govern}
 
-MISSION GOAL: ${plan.goal}
 TASK NODE [${node.id}] ${node.title} (verification class ${node.v_class})
 INSTRUCTION: ${node.instruction || node.title}
 ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
@@ -152,28 +213,62 @@ Do the work on the agent branch. Then:
   {check_command, exit_status, output_digest, timestamp}. The timestamp MUST be the real
   wall-clock time from your environment, never a placeholder like 00:00:00Z. No passing recorded check ⇒ do
   NOT claim done; report outcome="failed" with notes, OR if the task is genuinely
-  judgment-bound, say so in notes (it will be downgraded to V2).
+  judgment-bound, say so in notes (it will be downgraded to V2).${r0Phase}
+- Return PUSHED EVIDENCE for review: the raw git diff of your changes in "diff" and the file
+  list in "files_touched" — reviewers judge from what you push, so push the real thing.
 - If you discover the node's acceptance criteria are themselves wrong / a dependency
   surprise makes them unreachable: outcome="plan_assumption_false" with replan_reason.
 - Additive only: commit to the agent branch. Never merge, force-push, or act outward.`
 }
 
-function criticPrompt(node, artifact, lens) {
-  return `${govern}
-
-You are an ADVERSARIAL CRITIC. Your job is to find what is WRONG with the artifact below,
-defaulting to REJECT under uncertainty. You see the ARTIFACT ONLY — not the actor's
-reasoning. ${lens ? `Apply specifically the ${lens} lens.` : ''}
-
-TASK NODE [${node.id}] ${node.title}
-ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
-ARTIFACT UNDER REVIEW:
-${artifact}
-
-Return findings. Each finding needs {severity, claim, evidence}. A "blocker" is ONLY valid
+// Shared closing contract for every gating critic (§3.3).
+const criticRules = `Return findings. Each finding needs {severity, claim, evidence}. A "blocker" is ONLY valid
 if it cites a specific named acceptance criterion or constitution clause in cited_criterion
 — an uncited blocker is invalid and will be discarded. When severity is uncertain, choose
 "major", not "blocker".`
+
+// R1 (§3.1): spec-blind diff review. The critic sees the node contract and the RAW DIFF —
+// deliberately NOT the actor's narrative — so it judges whether the diff satisfies the
+// contract without inheriting the actor's frame. No repo access; the diff is the artifact.
+function r1CriticPrompt(node, actor) {
+  return `${govern}
+
+You are an ADVERSARIAL CRITIC doing a SPEC-BLIND DIFF REVIEW, defaulting to REJECT under
+uncertainty. You see the node contract and the raw diff ONLY — no author narrative, by design.
+Judge ONE question: does this diff satisfy the named acceptance criteria, without collateral
+damage visible in the diff itself? Do not explore the repo.
+
+TASK NODE [${node.id}] ${node.title}
+ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
+FILES TOUCHED: ${JSON.stringify(actor.files_touched || null)}
+RAW DIFF UNDER REVIEW:
+${actor.diff || '(actor pushed no diff — treat that itself as a major finding)'}
+
+${criticRules}`
+}
+
+// R2 (§3.1): cold-eye review of pushed evidence + a bounded independent spot-check. The actor
+// never knows WHICH claims get verified, so all claims must be honest — trust-but-verify with
+// unpredictable sampling, at a fixed cost instead of open-ended re-exploration.
+function r2CriticPrompt(node, actor, lens) {
+  return `${govern}
+
+You are an ADVERSARIAL CRITIC. Your job is to find what is WRONG with the work below,
+defaulting to REJECT under uncertainty. You see the actor's pushed evidence — summary, diff,
+files — but NOT its reasoning. ${lens ? `Apply specifically the ${lens} lens.` : ''}
+You have a SPOT-CHECK BUDGET of at most 5 file reads in the repo: spend them at YOUR OWN
+choosing to independently verify the claims you find most load-bearing or most suspicious
+(callers of changed code, conventions, a test the actor claims passes). Do NOT explore
+open-endedly; reads beyond verifying a specific claim are waste.
+
+TASK NODE [${node.id}] ${node.title}
+ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
+ACTOR SUMMARY: ${actor.artifact_summary}
+FILES TOUCHED: ${JSON.stringify(actor.files_touched || null)}
+DIFF:
+${actor.diff || '(actor pushed no diff — treat that itself as a major finding)'}
+
+${criticRules}`
 }
 
 // Cold reviewer (§3.4): fresh eyes on an artifact that tentatively PASSED, blind to the
@@ -259,7 +354,7 @@ function isReady(node, doneSet) {
 async function runNode(node) {
   if (completed[node.id]) return completed[node.id]
 
-  let actor = await agent(actorPrompt(node), {
+  let actor = await spawn(actorPrompt(node), {
     label: `actor:${node.id}`, phase: 'Execute', schema: ACTOR_SCHEMA,
   })
   if (!actor) return { node: node.id, status: 'lost', reason: 'actor died' }
@@ -273,7 +368,7 @@ async function runNode(node) {
   let tries = 0
   while (actor.outcome === 'failed' && tries < capFor(node, 'micro_loop_retries')) {
     tries++
-    actor = await agent(
+    actor = await spawn(
       `${actorPrompt(node)}\n\nPRIOR ATTEMPT FAILED: ${actor.notes || ''}. Retry (attempt ${tries + 1}).`,
       { label: `actor:${node.id}:retry${tries}`, phase: 'Execute', schema: ACTOR_SCHEMA },
     )
@@ -290,13 +385,14 @@ async function runNode(node) {
   // improve or no-op — a botched/failed revision is discarded, so a node never regresses.
   const eligibleForImprover = node.ac_required && !node.is_final_deliverable
   const improverOn = eligibleForImprover && MCLASS !== 'M0' &&
-    (MCLASS === 'M2' ? node.improve_pass !== false : node.improve_pass === true)
+    (MCLASS === 'M2' ? node.improve_pass !== false : node.improve_pass === true) &&
+    !budgetExhausted()   // advisory pass, first thing shed under budget pressure (§6.4)
   if (actor.outcome === 'done' && improverOn) {
-    const improver = await agent(improverPrompt(node, actor.artifact_summary),
+    const improver = await spawn(improverPrompt(node, actor.artifact_summary),
       { label: `improver:${node.id}`, phase: 'Execute', schema: CRITIC_SCHEMA })
     const suggestions = (improver && improver.findings) || []
     if (suggestions.length > 0) {
-      const revised = await agent(reviseActorPrompt(node, suggestions),
+      const revised = await spawn(reviseActorPrompt(node, suggestions),
         { label: `actor:${node.id}:revise`, phase: 'Execute', schema: ACTOR_SCHEMA })
       if (revised) {
         if (revised.outcome === 'plan_assumption_false')
@@ -311,22 +407,23 @@ async function runNode(node) {
   const selfClosed = (node.v_class === 'V0' || node.v_class === 'V1') &&
     actor.outcome === 'done' && actor.closure_record &&
     actor.closure_record.exit_status === 0
-  const needsCritic = node.ac_required || node.is_final_deliverable ||
-    ((node.v_class === 'V0' || node.v_class === 'V1') && !selfClosed)
 
-  if (!needsCritic) {
-    return { node: node.id, status: actor.outcome, actor, closed_by: selfClosed ? 'check' : 'executor' }
+  // Review gate at the node's effective R-tier (§3.1): the V→R floor binds, the planner may
+  // only raise. R0 already ran INSIDE the actor (two-phase prompt) and gates nothing — the
+  // closure record is the gate.
+  const tier = effectiveTier(node, selfClosed)
+  if (tier === 'R0') {
+    return { node: node.id, status: actor.outcome, actor, review_tier: tier,
+             closed_by: selfClosed ? 'check' : 'executor' }
   }
 
-  // Actor-critic gate (§3). Panel for the final deliverable, else 1 critic. Trimmed to 2
-  // lenses: criteria-conformance duplicated correctness in practice (first daylight mission),
-  // so the third agent bought ~no distinct findings. Budget relocated to the cold-improver above.
-  const lenses = node.is_final_deliverable
-    ? ['correctness', 'completeness']
-    : [null]
+  // R1: one spec-blind diff critic. R2: one cold-eye critic with a ≤5-read spot-check budget.
+  // R3: lens panel (trimmed to 2 — criteria-conformance duplicated correctness in practice on
+  // the first daylight mission, so the third agent bought ~no distinct findings).
+  const lenses = tier === 'R3' ? ['correctness', 'completeness'] : [null]
   const findingSets = await parallel(lenses.map(lens => () =>
-    agent(criticPrompt(node, actor.artifact_summary, lens),
-      { label: `critic:${node.id}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA })))
+    spawn(tier === 'R1' ? r1CriticPrompt(node, actor) : r2CriticPrompt(node, actor, lens),
+      { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA })))
 
   const verdict = adjudicate(findingSets)
 
@@ -337,7 +434,7 @@ async function runNode(node) {
   let coldConfirmed = false
   const candidateClean = verdict.blockers.length === 0 && verdict.majors.length === 0
   if (node.is_final_deliverable && candidateClean && capFor(node, 'cold_swaps') > 0) {
-    const cold = await agent(coldCriticPrompt(node, actor.artifact_summary),
+    const cold = await spawn(coldCriticPrompt(node, actor.artifact_summary),
       { label: `critic:${node.id}:cold`, phase: 'Execute', schema: CRITIC_SCHEMA })
     coldConfirmed = true
     if (cold) {
@@ -350,7 +447,7 @@ async function runNode(node) {
 
   return {
     node: node.id, status: actor.outcome, actor,
-    closed_by: 'critic', critic: verdict,
+    closed_by: 'critic', critic: verdict, review_tier: tier,
     cold_confirmed: coldConfirmed,
     blocked: verdict.blockers.length > 0,
   }
@@ -358,7 +455,8 @@ async function runNode(node) {
 
 // ── Main DAG walk: wave-based ready-set (correct for general DAG + dynamic replan) ──
 phase('Execute')
-log(`Mission ${plan.run_id} — ${plan.nodes.length} nodes, mode=${MODE}, class=${MCLASS}, constitution=${C}`)
+log(`Mission ${plan.run_id} — ${plan.nodes.length} nodes, mode=${MODE}, class=${MCLASS}, constitution=${C}` +
+  (TOKEN_BUDGET || AGENT_BUDGET ? `, budget=${TOKEN_BUDGET || '∞'}tok/${AGENT_BUDGET || '∞'}agents` : ''))
 if (MCLASS !== _claimedClass)
   log(`⚠ Mission class floored ${_claimedClass} → ${MCLASS} (§2.4 backstop): plan under-classified vs deterministic floor.`)
 
@@ -366,8 +464,18 @@ const doneSet = new Set(Object.keys(completed))
 const results = { ...completed }
 let nodes = plan.nodes.slice()
 let replanBudget = (DEFAULT_CAPS.subtree_replans * 2) // mission-level ceiling (§6.2: 3/mission; kept conservative)
+let budgetDiverged = false
 
 while (doneSet.size < nodes.length) {
+  // Budget gate (§6.4) at WAVE granularity: exhaustion stops opening new nodes; whatever is
+  // mid-wave completes (never a mid-node kill). AUDIT still runs on what exists.
+  if (budgetExhausted()) {
+    budgetDiverged = true
+    log(`Mission budget exhausted (${tokensUsed()} output tok / ${_agentsSpawned} agents vs ` +
+      `${TOKEN_BUDGET || '∞'}/${AGENT_BUDGET || '∞'}) — DIVERGED(budget) per §6.3. ` +
+      `${nodes.length - doneSet.size} node(s) unopened → defect ledger. Finalizing.`)
+    break
+  }
   const ready = nodes.filter(n => !doneSet.has(n.id) && isReady(n, doneSet))
   if (ready.length === 0) {
     log('No ready nodes and DAG incomplete — dependency deadlock or all-blocked. Finalizing (diverged).')
@@ -414,6 +522,15 @@ phase('Audit')
 const blockers = Object.values(results).flatMap(r => (r.critic && r.critic.blockers) || [])
 const majors = Object.values(results).flatMap(r => (r.critic && r.critic.majors) || [])
 const replans = Object.values(results).filter(r => r.status === 'replan')
+// Planned-vs-actual for the run-record (§7) — the telemetry that calibrates class defaults.
+function budgetReport() {
+  return {
+    token_budget: TOKEN_BUDGET, agent_budget: AGENT_BUDGET,
+    tokens_spent: tokensUsed(), agents_spawned: _agentsSpawned,
+    exhausted: budgetDiverged,
+    unopened_nodes: nodes.filter(n => !doneSet.has(n.id)).map(n => n.id),
+  }
+}
 
 // M0 (errand): no separate audit agent. A node's own close-time check (§2.1) IS the audit;
 // re-running one just-passed check from a fresh agent buys nothing. Verdict is deterministic.
@@ -426,12 +543,14 @@ if (MCLASS === 'M0') {
   return {
     run_id: plan.run_id,
     mission_class: MCLASS,
-    verdict: (blockers.length === 0 && !failed) ? 'DELIVERED' : 'DIVERGED',
+    verdict: (blockers.length === 0 && !failed && !budgetDiverged) ? 'DELIVERED' : 'DIVERGED',
+    diverged_reason: budgetDiverged ? 'budget' : null,
     unresolved_blockers: blockers,
     accepted_majors: majors,
     replans: replans.map(r => ({ node: r.node, reason: r.reason })),
     punchlist: [],
     ledger,
+    budget: budgetReport(),
     node_results: results,
   }
 }
@@ -445,7 +564,7 @@ const auditSummary = Object.values(results).map(r =>
   `[${r.node}] status=${r.status} closed_by=${r.closed_by || '-'}` +
   `${r.critic ? ` blockers=${r.critic.blockers.length} majors=${r.critic.majors.length}` : ''}`).join('\n')
 
-const audit = await agent(`${govern}
+const audit = await spawn(`${govern}
 
 AUDIT PHASE for mission ${plan.run_id} (class ${MCLASS}), goal: ${plan.goal}.
 Per-node execution results:
@@ -454,6 +573,7 @@ ${auditSummary}
 Unresolved blockers (human-only to waive): ${JSON.stringify(blockers)}
 Open majors (agent accept-with-reason allowed): ${JSON.stringify(majors)}
 Plan-assumption-false nodes: ${JSON.stringify(replans.map(r => ({ node: r.node, reason: r.reason })))}
+${budgetDiverged ? `BUDGET EXHAUSTED mid-mission (§6.4): unopened nodes ${JSON.stringify(budgetReport().unopened_nodes)} — these go to the defect ledger as unreached, and the verdict is DIVERGED.` : ''}
 
 ${recheckInstruction} Assemble the punchlist (each item is a candidate new node) and the
 defect ledger (majors accepted-with-reason + minors + unreached criteria). Verdict DELIVERED
@@ -463,11 +583,13 @@ unless the mission diverged (§6.3) or an unwaived blocker remains.`,
 return {
   run_id: plan.run_id,
   mission_class: MCLASS,
-  verdict: audit ? audit.verdict : 'DIVERGED',
+  verdict: budgetDiverged ? 'DIVERGED' : (audit ? audit.verdict : 'DIVERGED'),
+  diverged_reason: budgetDiverged ? 'budget' : null,
   unresolved_blockers: blockers,            // human-only; drive the "Needs you" report section
   accepted_majors: majors,
   replans: replans.map(r => ({ node: r.node, reason: r.reason })),
   punchlist: audit ? audit.punchlist : [],
   ledger: audit ? audit.ledger : [],
+  budget: budgetReport(),
   node_results: results,
 }

@@ -3,9 +3,58 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
-## [Unreleased]
+## [0.3] — 2026-06-10
+
+Token frugality as a design principle, review depth as a dial, and recovery plumbing separated
+from work-quality machinery. Driven by the §11 resume-loop incident (23 futile overnight
+firings) and the grilling that followed it.
 
 ### Added
+- **Review tiers R0–R3 (§3.1)** — review depth becomes a per-node dial beside V-class and
+  M-class: R0 adversarial self-audit (two-phase actor prompt, rides the actor's own cached
+  context), R1 spec-blind diff review (raw diff, no actor narrative), R2 cold-eye + bounded
+  ≤5-read spot-check, R3 lens panel. **V→R floors bind in the constitution body** (V0/V1-closed
+  ⇒ R0 permitted; V2/outward ⇒ ≥R2; final deliverable ⇒ R3); above the floor the planner has
+  full discretion with a one-line `review_rationale` per node, an R-tier histogram at the FREEZE
+  go-gate, and per-node **escape-rate telemetry** in the run-record so cheap tiers are validated
+  on evidence.
+- **Mission budget (§6.4)** — dual ceiling frozen in `plan.json` at PLAN: `token_budget`
+  (executor-observable output tokens via the Workflow `budget` global) + `agent_budget` (total
+  spawns — the proxy for the cache-read fan-out cost the token meter can't see). Exhaustion is
+  a **divergence** (§6.3): no new nodes, in-flight nodes close, AUDIT runs, verdict
+  `DIVERGED(budget)`; never a mid-node kill, never a skipped gate. Planned-vs-actual lands in
+  the run-record for class-default calibration.
+- **Canonical context pack (§6.4)** — the executor puts a byte-identical shared prefix
+  (operating card pointer + mission facts + plan summary) at the top of every spawn's prompt so
+  agents after the first hit the prompt cache; actors return **pushed evidence** (raw diff +
+  files touched) that reviewers judge from directly. Kills the "spawn a bunch and each one reads
+  from the start" cost shape — and incidentally strengthens the gate: critics previously judged
+  from the actor's narrative summary alone, with no diff at all.
+- **Per-invocation Workflow grant for headless resume (§11)** — the heartbeat's `claude` lines
+  carry `--allowedTools "Workflow"`, scoped to the single invocation, so a resumed mission can
+  actually re-dispatch the executor (all 23 incident resumes were structurally futile without
+  it). Authorized by the human at launch — arming the heartbeat is part of the launch they
+  approve; no standing `settings.json` grant.
+
+### Changed
+- **Constitution 0.2 → 0.3** — §3.1 rewritten as the R-tier ladder + floors; §3.2 fresh-context
+  rule scoped to *gating* critics (R0 gates nothing — the closure record is the gate); §6.3/§6.4
+  budget-exhaustion-as-divergence + the context-pack discipline; §11 rewritten (below).
+- **§11 resume semantics: futility-only (resume is plumbing, attempts are work-quality).**
+  Recovery resumes are **uncounted** — a mission spanning N usage windows legitimately resumes N
+  times; the invariant is "a stale heartbeat survives at most one *futile* firing." The
+  `-MaxResumes 3` total cap from the initial fix conflated recovery plumbing with work-quality
+  bounds (which belong to the executor, §6.2) and would have killed legitimate multi-window
+  missions; replaced by one-futile-resume → disarm + `heartbeat.dead`, plus a `-RunawayStop 20`
+  hard brake documented as insurance against a fooled progress detector, not policy. Smoke-tested:
+  futile → disarm; productive 4th resume → proceeds; 20 resumes → runaway disarm.
+- **Plan schema 0.2** — adds `token_budget`, `agent_budget` (mission level), `review_tier` +
+  `review_rationale` (node level); still accepts 0.1 plans (executor derives R floors when
+  `review_tier` is absent).
+
+### Earlier in this batch (committed 2026-06-10 before the grilling)
+
+### Added (pre-grilling)
 - **§11 heartbeat plumbing** (`scripts/mission_heartbeat.ps1`) — the constitution described the
   orchestrator-armed auto-resume abstractly, but no concrete implementation existed; the first M2
   mission (`natalie-fable-revision-20260609`) died at the usage limit mid-PLAN with nothing armed
@@ -15,7 +64,7 @@ version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https:
   complete/absent marker → self-disarm); `disarm` removes task + markers. Resume runs under the
   default permission mode — pre-granting autonomy stays a human settings action.
 
-### Changed
+### Changed (pre-grilling)
 - **`/mission` arms at PLAN, not FREEZE** — §11 says arming happens at launch; a session that
   dies grilling or fighting cannot schedule its own resurrection. The arming step now carries the
   concrete `mission_heartbeat.ps1 arm` / `disarm` commands.
@@ -25,7 +74,7 @@ version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https:
   operating card, read only `plan.json` + `brief.md`, and bound repo exploration to a spot-check
   budget against the paths a node actually names.
 
-### Fixed
+### Fixed (pre-grilling; resume-cap semantics superseded above)
 - **Heartbeat resume loop (`scripts/mission_heartbeat.ps1`) — the §11 "a stale heartbeat survives at
   most one firing" invariant was described but never implemented.** The only guard
   (`heartbeat.spawning`) is removed in `finally`, so it blocked concurrent resumes but not the 30-min
