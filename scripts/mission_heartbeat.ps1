@@ -12,8 +12,10 @@
 #   disarm:  powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 disarm -RunDir <repo>\.mission\<run-id>
 #   status:  powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 status -RunDir <repo>\.mission\<run-id>
 #
-# Headless resume runs under the DEFAULT permission mode -- pre-granting broader autonomy
-# (e.g. the Workflow tool) is a human settings action, never this script's.
+# Headless resume carries a PER-INVOCATION grant (--allowedTools "Workflow") so the resumed
+# session can re-drive the executor. The human authorizes this at launch: arming the heartbeat
+# is part of the mission launch they approve (section 11). No standing settings.json change --
+# the grant lives only on the two claude command lines below and dies with each invocation.
 param(
     [Parameter(Mandatory = $true, Position = 0)][ValidateSet('arm', 'beat', 'disarm', 'status')]
     [string]$Action,
@@ -21,7 +23,10 @@ param(
     [string]$Lock,
     [int]$IntervalMin = 30,   # beat cadence
     [int]$StaleMin = 45,      # no activity for this long => the run is presumed dead
-    [int]$MaxResumes = 3,     # §11 backstop: total resume attempts before the beat gives up + disarms
+    [int]$RunawayStop = 20,   # insurance against a fooled progress detector -- NOT a policy knob.
+                              # Recovery resumes are uncounted by design (a mission spanning N usage
+                              # windows legitimately resumes N times); futility detection below is
+                              # the real section-11 guard. This only brakes a runaway edge case.
     [switch]$DryRun           # beat: log the resume decision but do not launch claude
 )
 $ErrorActionPreference = 'Stop'
@@ -144,23 +149,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             exit 0
         }
 
-        # §11 invariant -- "a stale heartbeat survives at most one firing." A resume that produced
-        # NO new mission activity is a DEAD resume; re-firing it every interval just burns the usage
-        # window (observed: 23 firings on natalie-fable-revision-20260609, staleness 59->599 min,
-        # zero progress, ~400K cold tokens per beat). So before resuming again: if the previous
-        # resume failed to advance $newest, or the total resume budget is spent, DISARM and leave a
-        # heartbeat.dead marker for the morning report -- a dead-and-unrecoverable run is a §12 alarm,
-        # not something to retry into the ground.
+        # Section-11 invariant -- "a stale heartbeat survives at most one FUTILE firing." Resume is
+        # recovery plumbing: a mission that spans N usage windows legitimately resumes N times, so
+        # recovery resumes are UNCOUNTED. The only thing this ledger detects is FUTILITY -- a resume
+        # that produced no new mission activity is a dead resume, and re-firing it every interval
+        # just burns the usage window (observed: 23 firings on natalie-fable-revision-20260609,
+        # staleness 59->599 min, zero progress, ~400K cold tokens per beat). One futile resume =>
+        # DISARM + heartbeat.dead marker for the morning report -- a dead-and-unrecoverable run is a
+        # section-12 alarm, not something to retry into the ground. Work thoroughness (actor-critic
+        # rounds, ladder caps) is the EXECUTOR's job (section 6.2), never this script's.
         $ledgerPath = Join-Path $cfg.run_dir 'heartbeat.resumes.json'
         $ledger = if (Test-Path $ledgerPath) { Get-Content $ledgerPath -Raw | ConvertFrom-Json }
-                  else { [pscustomobject]@{ attempts = 0; resumed_from = '' } }
-        $attempts = [int]$ledger.attempts
+                  else { [pscustomobject]@{ resumes = 0; resumed_from = '' } }
+        $resumes = [int]$ledger.resumes
         $deadReason = $null
-        if ($attempts -ge $MaxResumes) {
-            $deadReason = "resume budget exhausted ($attempts/$MaxResumes attempts)"
+        if ($resumes -ge 1 -and $ledger.resumed_from -and ([datetime]$ledger.resumed_from -ge $newest)) {
+            $deadReason = "prior resume made no progress (stale ${idleMin}min, no advance after resume $resumes)"
         }
-        elseif ($attempts -ge 1 -and $ledger.resumed_from -and ([datetime]$ledger.resumed_from -ge $newest)) {
-            $deadReason = "prior resume made no progress (stale ${idleMin}min, no advance since attempt $attempts)"
+        elseif ($resumes -ge $RunawayStop) {
+            $deadReason = "runaway stop ($resumes resumes) -- progress detector is being fooled; human inspection required"
         }
         if ($deadReason) {
             $deadMsg = "Mission $runId presumed dead and unrecoverable by heartbeat: $deadReason. " +
@@ -183,10 +190,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         Get-Date -Format 'o' | Set-Content -Path $spawnLock
 
         # Record this resume in the ledger BEFORE launching: the next beat compares $newest against
-        # resumed_from to decide whether this attempt actually moved the mission (above).
+        # resumed_from to decide whether this resume actually moved the mission (above).
         if (-not $DryRun) {
             [pscustomobject]@{
-                attempts     = ($attempts + 1)
+                resumes      = ($resumes + 1)
                 resumed_from = $newest.ToString('o')
                 last_resume  = (Get-Date -Format 'o')
             } | ConvertTo-Json | Set-Content -Path $ledgerPath -Encoding UTF8
@@ -199,9 +206,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             "complete or the run dir is gone, disarm via: powershell -NoProfile -ExecutionPolicy Bypass -File " +
             "$ScriptsDir\mission_heartbeat.ps1 disarm -RunDir '$($cfg.run_dir)' and stop. (2) if the mission is " +
             "waiting on a human gate, or a live session is actively driving this run, stop without acting. " +
-            "(3) otherwise resume from committed state; from here the mission takes the queued shape " +
-            "(minor questions: assume + log; blocking-critical: push notification). Never lower V-class " +
-            "floors or skip mandated critics."
+            "(3) otherwise resume from committed state; the Workflow tool is granted for this invocation " +
+            "only, so you can re-dispatch the executor on the frozen plan. From here the mission takes " +
+            "the queued shape (minor questions: assume + log; blocking-critical: push notification). " +
+            "Never lower V-class floors or skip mandated review tiers."
 
         try {
             if ($transcripts.Count -gt 0) {
@@ -209,7 +217,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
                 Log "BEAT  $runId  stale ${idleMin}min -> resume session $sid (cwd $($cfg.cwd))$(if ($DryRun) {' [DRY-RUN]'})"
                 if (-not $DryRun) {
                     Push-Location $cfg.cwd
-                    try { claude --resume $sid -p $prompt 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
+                    try { claude --resume $sid -p $prompt --allowedTools "Workflow" 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
                     finally { Pop-Location }
                 }
             } else {
@@ -218,7 +226,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
                 Log "BEAT  $runId  stale ${idleMin}min, no transcript -> fresh resume (cwd $($cfg.cwd))$(if ($DryRun) {' [DRY-RUN]'})"
                 if (-not $DryRun) {
                     Push-Location $cfg.cwd
-                    try { claude -p $prompt 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
+                    try { claude -p $prompt --allowedTools "Workflow" 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
                     finally { Pop-Location }
                 }
             }

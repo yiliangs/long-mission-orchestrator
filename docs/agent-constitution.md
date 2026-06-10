@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.2
+**Version:** 0.3
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -156,16 +156,44 @@ the caps.
 Trust is not a verification strategy. For V2 tasks — and anywhere the orchestrator elects
 it — an **independent critic** stress-tests the actor's output.
 
-### 3.1 Floors (mandatory critic, not orchestrator's discretion)
+### 3.1 Review tiers (R0–R3) and floors
 
-A critic is **required** for: every V2 task; anything irreversible or outward-facing; the
-final deliverable of any mission. Above these floors, the orchestrator decides per-task
-whether a-c is warranted. **Discretion above the floor; never below it.**
+Review is **mandatory** for: every V2 task; anything irreversible or outward-facing; the
+final deliverable of any mission. What varies is its **depth** — the **R-tier**, a per-node
+dial the planner sets at PLAN and freezes in `plan.json`, parallel to V-class (verification
+strength) and M-class (ceremony size):
+
+| Tier | Name | Mechanism | Marginal cost | Independence |
+|---|---|---|---|---|
+| **R0** | Adversarial self-audit | Two-phase actor prompt: implement, then stop and attack the change as if an intern wrote it. Rides the actor's own cached context — zero re-reading. | ~zero | none |
+| **R1** | Spec-blind diff review | Fresh critic: context pack + node contract + **raw diff only** — no actor narrative. Breaks frame inheritance. | low | frame-independent |
+| **R2** | Cold-eye + spot-check | Fresh critic: pushed evidence (diff, files touched, check transcripts) + a bounded repo budget (≤5 reads, critic's own choosing) to independently verify claims. The actor never knows which claims get checked, so all must be honest. | medium | high |
+| **R3** | Lens panel | Multiple fresh critics with distinct lenses (correctness, integration, regression…). | high | maximal |
+
+**Floors couple R to V — strong machine evidence buys cheap review; model-opined evidence
+demands expensive review:**
+
+| Node evidence | R floor |
+|---|---|
+| Closes on V0/V1 (valid closure record, §2.1) | **R0** permitted — the recorded check is the gate; R0 is hygiene on top, never the gate itself |
+| V2 (a-c implementation node) | **≥ R2** |
+| Irreversible / outward-facing / deliverable zone | **≥ R2** |
+| Final deliverable; plan-fight (M2) | **R3** |
+
+**Above the floor the planner has full discretion** — but every node's `review_tier` carries
+a one-line rationale in `plan.json`; a uniform distribution (all nodes one tier) must justify
+itself in the brief; and FREEZE displays the R-tier histogram next to the budgets at the
+go-gate. Whether cheap tiers actually hold the line is settled by **escape-rate telemetry**
+(§7): the run-record logs each node's R-tier and whether AUDIT/punchlist later caught a defect
+the node's review missed — floors tighten on evidence, not vibes. **Discretion above the
+floor; never below it.**
 
 ### 3.2 Critic mechanics (how, not just whether)
 
-1. **Fresh context.** The critic is a separate subagent. Self-review inside the actor's
-   context inherits the actor's blind spots — forbidden.
+1. **Fresh context.** A *gating* critic (R1+) is a separate subagent. Self-review inside
+   the actor's context inherits the actor's blind spots — forbidden **as a gate**. The R0
+   self-audit (§3.1) is the deliberate exception: permitted only where a V0/V1 closure
+   record is the gate, so the self-review gates nothing.
 2. **Artifact-only.** The critic sees the *output*, not the actor's reasoning/chain of
    thought. Prevents anchoring on the actor's rationalization.
 3. **Refute-framed.** The critic is instructed to *find what is wrong*, defaulting to
@@ -362,7 +390,7 @@ plan.json with a reason string.
 | Subtree replans | 2 per subtree, 3 per mission |
 | Plan-fight rounds | 3 |
 | Audit → punchlist → fix cycles | 2, then defect ledger |
-| Critic per a-c task | 1 critic default; 3-lens panel for final deliverable + plan-fight |
+| Review per a-c task | R-tier per node (§3.1): R2 default for V2 nodes; R3 panel for final deliverable + plan-fight; R2 spot-check budget ≤5 reads |
 | Cold-reviewer swaps (§3.4) | 1, fired only at a candidate-clean terminal on high-stakes nodes |
 
 ### 6.3 Finalization (not a deadline)
@@ -375,7 +403,9 @@ distinguishes:
 | **Late** | ETA slips, remaining work monotonically shrinking. | Continue. Log it. The plane lands when it lands. |
 | **Diverging** | Remaining work not shrinking over a window: punchlist growing faster than fixes, recurring replans, a node cycling. | Finalize gracefully: audit what exists, ledger, status report. |
 
-A mission is killed on **divergence**, never on the clock.
+A mission is killed on **divergence**, never on the clock. **Budget exhaustion (§6.4) is a
+divergence, not a deadline:** the executor stops opening new nodes, lets in-flight nodes
+close, audits what exists, and reports `DIVERGED(budget)` — never a mid-node kill.
 
 ### 6.4 Cost
 
@@ -395,6 +425,28 @@ citation-gated blockers (§3.3). Workers are therefore handed a distilled **oper
 preserves the fresh-context property (§1.4) — fresh context means *re-derived state, not
 re-read governance* — while cutting the per-spawn governance tax several-fold. The orchestrator
 alone loads the full constitution; the army carries the card.
+
+**Context is pushed, never pulled (the cache-prefix discipline).** "Spawn a bunch and each one
+reads from the start" is the dominant fan-out cost: every agent independently re-exploring the
+same artifacts multiplies input tokens by the army size. Instead the executor builds **one
+canonical context pack** — operating card + frozen plan + brief, **byte-identical and in the
+same order** at the top of every spawn's prompt — so every agent after the first hits the
+prompt cache instead of paying fresh input. Node-specific material (contract, pushed evidence)
+follows the shared prefix. Actors close with structured evidence (diff, files touched, check
+transcripts) that is **pushed into** the reviewer's prompt; a reviewer's own repo access is the
+bounded R2 spot-check budget (§3.1), not open-ended exploration. R0 takes this to the limit —
+the review turn rides the actor's already-cached transcript.
+
+**The mission budget (dual ceiling, frozen at PLAN).** Each M1/M2 plan carries a
+`token_budget` (executor-observable output tokens) and an `agent_budget` (total spawns) —
+proposed per mission class at PLAN, shown at the FREEZE go-gate, recorded planned-vs-actual in
+the run-record. Both are honest **proxies**: the true drain (cumulative cache-reads across the
+fan-out) is not observable mid-run, so the token ceiling catches generation-heavy runaways
+while the agent ceiling bounds fan-out multiplication — and §7 telemetry calibrates the class
+defaults from actuals. Exhausting either ceiling is a **divergence** (§6.3): finalize
+gracefully, never kill mid-node. A budget can narrow scope; it can **never** skip a gate or
+lower a floor — a run that cannot afford its own verification narrows scope (above), it does
+not verify less.
 
 ### 6.5 Parallelism by blast radius
 
@@ -431,7 +483,9 @@ merge authority at every tier above the first.
 - **Curated run-records, not raw transcripts.** Each mission writes a structured record
   (goal; frozen plan vs as-executed DAG with every replan/cap-hit/escalation; critic
   verdicts + overrides; defect ledger; the human-diff between delivered and accepted
-  artifact; cap stats; constitution **version**). Records are **written by the
+  artifact; cap stats; **budget planned-vs-actual** (§6.4); **per-node R-tier + escape
+  outcomes** — whether AUDIT/punchlist caught a defect the node's review tier missed (§3.1);
+  constitution **version**). Records are **written by the
   orchestrator, schema-validated — never synthesized by a second model.** Telemetry the
   framework keeps about itself must not pass through a paraphrase.
 - **The human-diff is the gold signal.** What the Human changes or rejects the next morning
@@ -546,8 +600,22 @@ mission. Mechanism: an **orchestrator-armed heartbeat**, not a standing job.
   token-dead session cannot schedule its own resurrection) and **disarms** it at mission
   end.
 - Each beat is **idempotent**: active run → exit; interrupted marker → resume from committed
-  state; complete/absent marker → disarm + exit. A stale heartbeat survives at most one
-  firing.
+  state; complete/absent marker → disarm + exit.
+- **Resume is recovery plumbing, and recovery is uncounted.** A mission spanning N usage
+  windows legitimately resumes N times. The invariant is: **a stale heartbeat survives at
+  most one *futile* firing** — a resume that produced no new mission activity is dead, and
+  the next beat disarms + leaves a `heartbeat.dead` marker (a §12 alarm), never re-fires it.
+  Work thoroughness (actor–critic rounds, ladder, caps) is the executor's job (§6.2); cost
+  is the mission budget's job (§6.4); the heartbeat carries **no** work-quality semantics. A
+  large hard stop in the script is runaway insurance against a fooled progress detector, not
+  a policy knob.
+- **The resumed session carries a per-invocation Workflow grant** (`--allowedTools
+  "Workflow"` on the heartbeat's `claude` command line) so it can re-dispatch the executor on
+  the frozen plan — without it, headless resume can re-orient but never relaunch, and §11's
+  promise is empty. The grant is scoped to the single invocation and dies with it; it is
+  **not** a standing `settings.json` change. The human authorizes it at launch: arming the
+  heartbeat is part of the mission launch they approve. The mission must never widen this
+  grant (§9.1).
 - This absorbs *every* death mode with one mechanism and no clock arithmetic. The limit
   kills a run; the next beat resumes it after the window resets.
 - The heartbeat is **plumbing, not a user surface.** `/mission` exposes only the goal and
