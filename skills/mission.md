@@ -1,6 +1,6 @@
 ---
 description: Run a mission — grill, plan, critic-fight, freeze, execute, audit, deliver — governed by the agent constitution.
-argument-hint: "<goal>" [--unattended | --queued]
+argument-hint: "<goal>" [--unattended | --queued] | --resume <run-id>
 ---
 
 # /mission
@@ -41,9 +41,35 @@ Parse `$ARGUMENTS` for the goal (quoted) and the flag:
 - `--unattended` → **unattended-live**: live opening grill, then autonomous.
 - `--queued` → **queued**: questions criticality-split (low assume+log, blocking-critical
   push to phone). This is the shape a heartbeat-launched or remote mission takes.
+- `--resume <run-id>` → **resume a dead mission** — see below; skips GRILL→FREEZE entirely.
 
 The mission **opens with the grill** (§4) — the one human-in-the-loop conversation, right
 after the goal. Concentrate all ambiguity there; after it, the mission runs autonomously.
+
+## Resume (`--resume <run-id>`)
+
+Manual recovery of an interrupted mission — the human-initiated twin of the §11 heartbeat
+resume. The executor is never invoked bare: resume re-enters **this orchestrator** at
+EXECUTE, so AUDIT → DELIVER (report, record, email) still happen. The frozen plan binds
+unchanged — resume never edits it; plan problems surface as subtree-replans inside EXECUTE,
+exactly as in a first run.
+
+1. **Locate** `<repo>/.mission/<run-id>/plan.json` in the current repo. Absent → stop and
+   ask for the repo; never resume from memory of the plan.
+2. **One driver only (§11).** Before touching anything, verify no other session is flying
+   this mission: check the heartbeat resume ledger + `mission.lock` in the run dir, and the
+   agent branch for commits in the last beat interval. Evidence of a live driver → stop and
+   report, don't double-drive. Leave the heartbeat armed (its beats are idempotent: active →
+   exit; it self-disarms at DELIVER as normal).
+3. **Reconstruct completed nodes from committed evidence only**: closure records in
+   `.mission/<run-id>/`, node commits on the `agent/mission-*` branch, any executor
+   `node_results` journaled to the run dir. A node with no committed evidence is NOT done,
+   whatever a transcript says — re-run it (idempotent by §10 design).
+4. **Re-enter EXECUTE**: dispatch the executor with the parsed plan plus
+   `completed: {<nodeId>: <result>, ...}` for every evidence-backed done node — the executor
+   skips those and walks the rest of the DAG (its documented resume contract).
+5. **Continue to AUDIT → DELIVER normally.** The run-record notes the resume (a `deviations`
+   line: when it died, what evidence reconstructed the frontier, which nodes re-ran).
 
 ## The phases
 
