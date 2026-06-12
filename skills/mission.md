@@ -144,6 +144,12 @@ worktree, and the mission fought twice — a multi-million-token bill before EXE
 **Round budget scales with class (§2.4):** M1 → 1 round, lenses scaled to plan size, and
 **early-exit** if the round surfaces no blocker/major. M2 → up to 3 rounds, full lens panel.
 
+**External-resource preflight (§6 PLAN, before FREEZE):** for every acceptance criterion that
+names a fetchable external resource (URL, API, registry page), probe reachability now —
+deterministic fetch, no model judgment. Unreachable → re-word the AC with a designated fallback
+source or carry it to Needs-you; never freeze an AC the executor provably cannot meet (the
+jobe-submit-audit run froze a "LIVE GfA" AC against a page that 403'd to agents).
+
 ### 4. FREEZE
 Write `plan.json` to `<repo>/.mission/<run-id>/plan.json`. Compute and record `eta`. Commit
 on an `agent/mission-<slug>` branch. **Go-gate scales with class (§2.4):** in **attended**
@@ -212,8 +218,9 @@ Punchlist items → new nodes → re-enter EXECUTE (capped: 2 cycles, then ledge
 
 Then **deliver**:
 - Write `REPORT.md` + `report.json` to `.mission/<run-id>/` (format: constitution §12 —
-  inverted pyramid, one screen, Needs-you items phrased as one-tap verdicts).
-- Write the **run-record** to fieldnotes (`mission_records/`), schema-validated, authored
+  inverted pyramid, one screen, Needs-you items phrased as one-tap verdicts; `report.json`
+  per `~/.claude/docs/mission-report.schema.json` — `needs_you[].ask`, not `item`).
+- Write the **run-record** to fieldnotes (`mission_records/`), record schema **v0.2**, authored
   by you — not synthesized. Include the human-diff slot (filled when the Human reviews).
   Populate `classification_calibration`: `mission_class` + per-node `features` and assigned
   classes. Leave the hindsight verdicts **null** — AUDIT fills any machine-check verdicts
@@ -225,6 +232,12 @@ Then **deliver**:
   in the run-record — this is the telemetry that calibrates class budget defaults, the V→R floor
   table, and the §3.6 model floors (a cheap tier that leaks defects past its gate tightens) (§7).
 - Append cap stats to `mission-caps.jsonl` (fieldnotes).
+- **Validate before sending (hard step, §12):** run
+  `python ~/.claude/scripts/validate_record.py ~/.claude/docs/mission-record.schema.json <record>`
+  and the same against `mission-report.schema.json` for `report.json` — exit 0 or fix the
+  document before the report goes out. **This step is unconditional**: a re-scoped, lean-pivoted,
+  or human-interrupted mission still writes and validates its record (two of the first four
+  v0.3.1 runs skipped the record entirely and their human verdicts had nowhere to land).
 - **Push** the verdict line (notification). **Email** REPORT.md via the deployed §12 channel:
   `python ~/.claude/scripts/mission_mailbox.py report <run-id>` (mints a reply-id so the Human's
   reply threads back and is routed by `LMO\MailboxPoll` into the run-record).

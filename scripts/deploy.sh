@@ -15,6 +15,7 @@ cp "$repo/docs/agent-constitution.md"          "$claude/docs/agent-constitution.
 cp "$repo/docs/operating-card.md"              "$claude/docs/operating-card.md"
 cp "$repo/schema/mission-plan.schema.json"     "$claude/docs/mission-plan.schema.json"
 cp "$repo/schema/mission-record.schema.json"   "$claude/docs/mission-record.schema.json"
+cp "$repo/schema/mission-report.schema.json"   "$claude/docs/mission-report.schema.json"
 cp "$repo/schema/cap-log.format.md"            "$claude/docs/cap-log.format.md"
 cp "$repo/executors/mission-executor.codex.md" "$claude/docs/mission-executor.codex.md"
 
@@ -28,10 +29,12 @@ cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-exe
 
 # Deterministic helpers -> scripts/
 cp "$repo/scripts/classify-mission.js" "$claude/scripts/classify-mission.js"
+cp "$repo/scripts/validate_record.py"  "$claude/scripts/validate_record.py"
 
 # Email channel (constitution §12) -> scripts/  (config lives at ~/.claude/mailbridge.env, not synced)
 cp "$repo/scripts/mailbridge.py"          "$claude/scripts/mailbridge.py"
 cp "$repo/scripts/mission_mailbox.py"     "$claude/scripts/mission_mailbox.py"
+cp "$repo/scripts/md2html.py"             "$claude/scripts/md2html.py"
 cp "$repo/scripts/run_mailbox_poll.cmd"   "$claude/scripts/run_mailbox_poll.cmd"
 cp "$repo/scripts/run_hidden.vbs"         "$claude/scripts/run_hidden.vbs"
 cp "$repo/scripts/mailbridge.env.example" "$claude/scripts/mailbridge.env.example"

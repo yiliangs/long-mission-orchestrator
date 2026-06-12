@@ -83,7 +83,15 @@ function budgetExhausted() {
          (AGENT_BUDGET != null && _agentsSpawned >= AGENT_BUDGET)
 }
 // Every spawn goes through here so planned-vs-actual lands in the run-record (§7).
-function spawn(prompt, opts) { _agentsSpawned++; return agent(prompt, opts) }
+// A mid-wave ceiling crossing is sanctioned (§6.4: in-flight work completes) but NEVER silent:
+// it is logged here and recorded as a mission-level cap_hit in budgetReport() — the first
+// daylight overrun (38/36) reached the report only as prose, invisible to §7 calibration.
+function spawn(prompt, opts) {
+  _agentsSpawned++
+  if (AGENT_BUDGET != null && _agentsSpawned === AGENT_BUDGET + 1)
+    log(`⚠ Agent ceiling crossed mid-wave (${_agentsSpawned}/${AGENT_BUDGET}) — in-flight work completes (§6.4); overrun lands in cap_hits.`)
+  return agent(prompt, opts)
+}
 
 // ── Review tiers (§3.1): V→R floors, planner discretion above ────────────────
 const _R = { R0: 0, R1: 1, R2: 2, R3: 3 }
@@ -384,6 +392,40 @@ function capFor(node, key) {
   return (node.caps && node.caps[key] != null) ? node.caps[key] : DEFAULT_CAPS[key]
 }
 
+// ── write_set conformance (§6.5, deterministic — no model call) ──────────────
+// The executor DERIVES parallel-safety from declared write_sets; an actor that writes outside
+// its declaration silently invalidates that derivation (and is scope creep). At node close,
+// diff the touched files against the declaration: any out-of-set file raises a MACHINE-evidence
+// blocker — only the Human may waive it (truth-source asymmetry, §2.2). Enforced only when the
+// planner declared a write_set; undeclared nodes already run conservative-serial.
+function _writeSetMatch(file, entry) {
+  const f = file.replace(/\\/g, '/').replace(/^\.\//, '')
+  const e = entry.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '')
+  if (f === e || f.startsWith(e + '/')) return true                 // exact file or directory prefix
+  if (e.includes('*')) {                                            // glob: ** crosses /, * does not
+    const rx = new RegExp('^' + e.replace(/[.+^${}()|[\]]/g, '\\$&')
+      .replace(/\*\*/g, ' ').replace(/\*/g, '[^/]*').replace(/ /g, '.*') + '$')
+    return rx.test(f)
+  }
+  return false
+}
+function writeSetBreach(node, actor) {
+  if (!Array.isArray(node.write_set) || node.write_set.length === 0) return null
+  const fromDiff = (actor.diff || '').split('\n')
+    .filter(l => l.startsWith('+++ b/')).map(l => l.slice(6).trim())
+  const touched = [...new Set([...(actor.files_touched || []), ...fromDiff])]
+    .filter(f => f && f !== '/dev/null')
+  const outside = touched.filter(f => !node.write_set.some(e => _writeSetMatch(f, e)))
+  if (!outside.length) return null
+  return {
+    severity: 'blocker',
+    claim: `write_set breach: node declared ${JSON.stringify(node.write_set)} but touched ${JSON.stringify(outside)}`,
+    evidence: 'deterministic diff-vs-declaration check (machine evidence — human-only to waive)',
+    cited_criterion: '§6.5 write_set declaration / §2.2 truth-source asymmetry',
+    suggested_fix: 'revert the out-of-set edits, or have the Human waive and widen the declaration in a replan',
+  }
+}
+
 function isReady(node, doneSet) {
   return (node.deps || []).every(d => doneSet.has(d))
 }
@@ -450,11 +492,22 @@ async function runNode(node) {
     actor.outcome === 'done' && actor.closure_record &&
     actor.closure_record.exit_status === 0
 
+  // write_set conformance (§6.5): deterministic diff-vs-declaration check at close. A breach
+  // is machine evidence — it gates EVERY tier, including R0 (the closure record proves the
+  // check passed, not that the actor stayed inside its blast radius).
+  const breach = actor.outcome === 'done' ? writeSetBreach(node, actor) : null
+  if (breach) log(`⚠ Node ${node.id}: ${breach.claim} — raised as machine-evidence blocker (§6.5).`)
+
   // Review gate at the node's effective R-tier (§3.1): the V→R floor binds, the planner may
   // only raise. R0 already ran INSIDE the actor (two-phase prompt) and gates nothing — the
   // closure record is the gate.
   const tier = effectiveTier(node, selfClosed)
   if (tier === 'R0') {
+    if (breach) {
+      return { node: node.id, status: actor.outcome, actor, review_tier: tier,
+               closed_by: selfClosed ? 'check' : 'executor',
+               critic: { blockers: [breach], majors: [], minors: [] }, blocked: true }
+    }
     return { node: node.id, status: actor.outcome, actor, review_tier: tier,
              closed_by: selfClosed ? 'check' : 'executor' }
   }
@@ -469,6 +522,7 @@ async function runNode(node) {
       { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
 
   const verdict = adjudicate(findingSets)
+  if (breach) verdict.blockers.push(breach)   // machine evidence joins the gate verdict (§6.5)
 
   // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
   // model call). Fire ONE cold reviewer only to double-check a *clean* verdict on the final
@@ -570,10 +624,19 @@ const majors = Object.values(results).flatMap(r => (r.critic && r.critic.majors)
 const replans = Object.values(results).filter(r => r.status === 'replan')
 // Planned-vs-actual for the run-record (§7) — the telemetry that calibrates class defaults.
 function budgetReport() {
+  // Any ceiling overrun MUST surface as a machine-readable cap_hit (schema v0.2 enum:
+  // token_budget / agent_budget, node sentinel "mission") — prose-only breaches are
+  // invisible to the §7 calibration corpus. would_have_converged is AUDIT's judgment.
+  const cap_hits = []
+  if (AGENT_BUDGET != null && _agentsSpawned > AGENT_BUDGET)
+    cap_hits.push({ node: 'mission', cap: 'agent_budget', limit: AGENT_BUDGET, used: _agentsSpawned, would_have_converged: null })
+  if (TOKEN_BUDGET != null && tokensUsed() > TOKEN_BUDGET)
+    cap_hits.push({ node: 'mission', cap: 'token_budget', limit: TOKEN_BUDGET, used: tokensUsed(), would_have_converged: null })
   return {
     token_budget: TOKEN_BUDGET, agent_budget: AGENT_BUDGET,
     tokens_spent: tokensUsed(), agents_spawned: _agentsSpawned,
     exhausted: budgetDiverged,
+    cap_hits,
     unopened_nodes: nodes.filter(n => !doneSet.has(n.id)).map(n => n.id),
   }
 }

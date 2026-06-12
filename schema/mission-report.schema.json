@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-mission-orchestrator/long-mission-orchestrator/mission-report.schema.json",
+  "title": "Mission morning report (report.json)",
+  "description": "Machine-readable twin of REPORT.md (§12), written to .mission/<run-id>/report.json at DELIVER. Standardizes the shape so /mission-log-audit and the mailbox verdict-router can parse needs_you items without per-run guessing (the first two v0.3 runs disagreed on field names — this schema is the referee). Validate with scripts/validate_record.py.",
+  "type": "object",
+  "required": ["run_id", "verdict", "needs_you", "budget"],
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string" },
+    "verdict": { "enum": ["DELIVERED", "DIVERGED"] },
+    "mission_class": { "enum": ["M0", "M1", "M2"] },
+    "branch": { "type": "string" },
+    "commits": { "type": "integer" },
+
+    "needs_you": {
+      "type": "array",
+      "description": "The one-tap verdicts. Field name is `ask` (not `item`); ids are short stable strings so email replies can cite them.",
+      "items": {
+        "type": "object",
+        "required": ["id", "ask", "verdict_options"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": ["string", "integer"] },
+          "ask": { "type": "string" },
+          "verdict_options": { "type": "array", "items": { "type": "string" } },
+          "evidence_class": { "type": "string", "description": "machine | model | human — what kind of evidence backs the ask." }
+        }
+      }
+    },
+
+    "accepted_with_reason": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Majors accepted with reason (§3.3 ledger), one line each."
+    },
+
+    "defect_ledger": {
+      "type": "array",
+      "description": "Known shortfalls in the delivered artifact (§5).",
+      "items": {
+        "type": "object",
+        "required": ["id", "class", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "class": { "enum": ["machine", "model", "human"] },
+          "text": { "type": "string" }
+        }
+      }
+    },
+
+    "audit": {
+      "type": "object",
+      "description": "AUDIT-phase summary. Lenient — narrative varies by mission class.",
+      "additionalProperties": true
+    },
+
+    "budget": {
+      "type": "object",
+      "description": "§6 dual ceiling vs actual. An overrun here MUST also be a cap_hit in the fieldnotes run-record.",
+      "required": ["token_budget", "tokens_spent", "agent_budget", "agents_spawned"],
+      "additionalProperties": false,
+      "properties": {
+        "token_budget": { "type": "integer" },
+        "tokens_spent": { "type": "integer" },
+        "agent_budget": { "type": "integer" },
+        "agents_spawned": { "type": "integer" },
+        "exhausted": { "type": "boolean" }
+      }
+    },
+
+    "screening": {
+      "type": "object",
+      "description": "Paper-mission rejection-risk screening summary (optional).",
+      "additionalProperties": true
+    },
+
+    "done": {
+      "type": "object",
+      "description": "Per-AC evidence-class summary, AC id -> one-line evidence string.",
+      "additionalProperties": { "type": "string" }
+    },
+
+    "evidence_class_summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "machine": { "type": "array", "items": { "type": "string" } },
+        "model": { "type": "array", "items": { "type": "string" } },
+        "human_pending": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

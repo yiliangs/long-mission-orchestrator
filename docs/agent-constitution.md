@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.1
+**Version:** 0.3.2
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -376,6 +376,11 @@ PLAN    Orchestrator reads constitution + repo contract + machine profile +
         (project card, if present) → drafts a DAG. Each node carries: deps,
         parallelizable?, acceptance criteria, V-class, a-c flag, caps,
         compute-role requirement.
+        External-resource preflight: any AC that names a fetchable external
+        resource (URL, API, registry) is probed for reachability before
+        FREEZE (deterministic, no model call). Unreachable → re-word the AC
+        with a fallback source or carry it to Needs-you; never freeze an AC
+        the executor provably cannot meet.
   │
 FIGHT   Critic panel attacks the PLAN with diverse lenses (feasibility,
         completeness, dependency-correctness, scope, verification-adequacy).
@@ -484,7 +489,10 @@ while the agent ceiling bounds fan-out multiplication — and §7 telemetry cali
 defaults from actuals. Exhausting either ceiling is a **divergence** (§6.3): finalize
 gracefully, never kill mid-node. A budget can narrow scope; it can **never** skip a gate or
 lower a floor — a run that cannot afford its own verification narrows scope (above), it does
-not verify less.
+not verify less. A ceiling crossed **mid-wave** (in-flight nodes completing per §6.3) is
+sanctioned but never silent: the executor records it as a mission-level `cap_hit`
+(`token_budget` / `agent_budget`) in the run-record — a breach that exists only as report
+prose is invisible to §7 calibration.
 
 ### 6.5 Parallelism by blast radius
 
@@ -504,6 +512,13 @@ as a disjoint subset under worktree isolation, and the disjoint constraint makes
 merge **conflict-free by construction**. An absent write-set is conservative (serial) — a node
 earns fan-out by declaring its blast radius. The actor reports its *actual* write-set on
 completion; estimate-vs-actual feeds calibration (§7).
+
+**Declared write-sets are enforced at close.** The executor diffs the actor's touched files
+against the declaration (deterministic, no model call, §1.3); any out-of-set write raises a
+**machine-evidence blocker** — human-only to waive (§2.2 truth-source asymmetry). However
+benign the edit, an actor that writes outside its declaration has invalidated the
+parallel-safety derivation; the cure is a waiver-plus-widened-declaration, never a silent
+accept.
 
 ---
 
@@ -683,6 +698,12 @@ Four unambiguous morning signals, so silence is never confused with progress:
   visible. This is the report's primary job — it carries the V0–V3 distinction (§2, §2.3) all
   the way to the tired human at 7am, so trust calibrates to the actual evidence, not to the
   uniform look of a checkmark.
+- **The run-record is a DELIVER step, not a courtesy.** Every mission — including re-scoped,
+  lean-pivoted, or human-interrupted ones — writes `mission_records/<run-id>.json` (record
+  schema v0.2) and validates it deterministically (`scripts/validate_record.py`) before the
+  report goes out; `report.json` validates against `mission-report.schema.json` the same way.
+  A mission that skips its record starves the §7 gold signal — two of the first four v0.3.1
+  runs did exactly this, and the human verdicts had nowhere to land.
 - Reports + records flow to **fieldnotes** (telemetry); this constitution + contracts +
   skills live in **claude-config** (governance). Don't mix the two.
 

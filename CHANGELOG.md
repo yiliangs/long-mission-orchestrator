@@ -3,6 +3,56 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.2] — 2026-06-11
+
+Hardening driven by the first four v0.3.1 missions (web-ui-port, jobe-submit-audit, and the
+natalie transition pair). The machinery held — layered defense caught a silent-ship defect,
+FIGHT killed a would-have-shipped blocker, deferral discipline was exemplary — but the
+**telemetry pipeline leaked**: the record schema was unsatisfiable, two runs skipped their
+records entirely, and a budget-ceiling breach reached the report only as prose. The theme of
+this release: **a signal that exists only as prose does not exist for calibration.**
+
+### Added
+- **`schema/mission-report.schema.json`** — `report.json` (§12) gets a schema; the first two
+  v0.3.1 runs disagreed on field names (`ask` vs `item`) within the same day. Canonical field
+  is `needs_you[].ask`.
+- **`scripts/validate_record.py`** — stdlib-only validator (the JSON-Schema subset the LMO
+  schemas use) so "schema-validated" is an executable claim. Wired into the DELIVER step as a
+  **hard, unconditional** gate; records with `schema_version` 0.1/absent are warn-only legacy.
+- **External-resource preflight (§6 PLAN)** — any AC naming a fetchable external resource is
+  reachability-probed before FREEZE; never freeze an AC the executor provably cannot meet
+  (jobe froze "LIVE GfA" against a page that 403'd to agents).
+- **write_set enforcement (§6.5, executor)** — deterministic diff-vs-declaration check at node
+  close; an out-of-set write raises a **machine-evidence blocker** (human-only to waive). The
+  jobe run's out-of-write_set `backmatter.tex` edit was honest but ad hoc; now it's gated.
+- **HTML email rendering (`scripts/md2html.py`)** — the §12 channel rendered reports as escaped
+  raw markdown in monospace; now a stdlib markdown→HTML converter (inline CSS, email-safe:
+  headings, tables, lists, code, blockquotes, links) with the raw md retained as the
+  text/plain fallback.
+
+### Changed
+- **Record schema 0.1 → 0.2** — v0.1 was *unsatisfiable*: `nodes_executed` was required but
+  undefined under `additionalProperties:false`, so validation could never pass — which is why
+  it never ran and records drifted. v0.2 defines `nodes_executed` and adopts the telemetry
+  blocks the v0.3 constitution requires but the schema predated: `compute_tiers` (§3.6),
+  `r_tier_escape_outcomes` (§7), `escalation_precision` (§3.3), `budget_planned_vs_actual`
+  (§6.4), `audit`. `cap_hits.cap` gains `token_budget` / `agent_budget` (node sentinel
+  `"mission"`).
+- **§6.4 budget semantics** — a ceiling crossed mid-wave (in-flight nodes completing) is
+  sanctioned but never silent: the executor logs the crossing and records a mission-level
+  `cap_hit`. The jobe overrun (38/36 agents) reached the report only as prose — invisible to
+  §7 calibration.
+- **§12 reporting** — the run-record is a DELIVER step, not a courtesy: re-scoped, lean-pivoted,
+  and human-interrupted missions still write + validate records (the natalie pair, both
+  governed by 0.3.1, wrote none — and their pending human verdicts had nowhere to land).
+- **Constitution 0.3.1 → 0.3.2** — the four amendments above.
+
+### Fixed
+- **Fieldnotes corpus repaired** — jobe + web-ui-port records now validate (jobe's agent-budget
+  breach backfilled as a `cap_hit`; web-ui-port's missing `human_review` block added); minimal
+  v0.2 records backfilled for the two natalie runs (transcribed from REPORT.md + plan.json) so
+  `/mission-log-audit` verdicts have a landing file.
+
 ## [0.3.1] — 2026-06-10
 
 Compute tier as the third frozen dial, and a sharper heartbeat futility signal. Both fall out

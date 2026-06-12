@@ -188,8 +188,13 @@ def _verdict_line(report: str) -> str:
 
 
 def _md_html(text: str) -> str:
-    return ("<div style=\"font-family:-apple-system,Segoe UI,Roboto,monospace;white-space:pre-wrap;"
-            "font-size:14px;line-height:1.5;color:#1a1a1a\">" + _html.escape(text) + "</div>")
+    """Render markdown to email HTML (md2html); degrade to escaped monospace on any failure."""
+    try:
+        import md2html
+        return md2html.render(text)
+    except Exception:
+        return ("<div style=\"font-family:-apple-system,Segoe UI,Roboto,monospace;white-space:pre-wrap;"
+                "font-size:14px;line-height:1.5;color:#1a1a1a\">" + _html.escape(text) + "</div>")
 
 
 def main() -> None:

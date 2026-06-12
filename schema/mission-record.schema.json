@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://long-mission-orchestrator/long-mission-orchestrator/mission-record.schema.json",
   "title": "Mission run-record",
-  "description": "Curated, schema-validated record of one mission, WRITTEN by the orchestrator (never synthesized by a second model — constitution §7). Lands in claude-fieldnotes/mission_records/<run-id>.json. The evolution loop reads these; a record is the only valid evidence for an amendment proposal.",
+  "description": "Curated, schema-validated record of one mission, WRITTEN by the orchestrator (never synthesized by a second model — constitution §7). Lands in claude-fieldnotes/mission_records/<run-id>.json. The evolution loop reads these; a record is the only valid evidence for an amendment proposal. v0.2: defines nodes_executed (v0.1 required it but never defined it — unsatisfiable under additionalProperties:false), adopts the v0.3-constitution telemetry blocks (compute_tiers §3.6, r_tier_escape_outcomes §7, escalation_precision §3.3, budget_planned_vs_actual §6, audit), and adds token_budget/agent_budget to the cap_hits enum. Validate at report time with scripts/validate_record.py — deterministic, no model call (§1.3).",
   "type": "object",
   "required": [
     "schema_version", "run_id", "goal", "repo", "mode",
@@ -10,7 +10,10 @@
   ],
   "additionalProperties": false,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": {
+      "enum": ["0.1", "0.2"],
+      "description": "New records MUST write \"0.2\". \"0.1\" is accepted only so legacy records stay parseable; the validator treats 0.1 as warn-only legacy."
+    },
     "run_id": { "type": "string" },
     "goal": { "type": "string" },
     "repo": { "type": "string" },
@@ -27,12 +30,38 @@
       "description": "Orchestration depth the mission ran at (§2.4). Recorded for classification calibration."
     },
 
+    "nodes_executed": {
+      "type": "array",
+      "description": "One entry per node the executor closed (or failed to). The per-node ground truth the calibration corpus keys on.",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "v_class"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["done", "diverged", "skipped", "replanned"] },
+          "closed_by": {
+            "enum": ["check", "critic", "human", "harness"],
+            "description": "What closed the node: check = V0/V1 closure record, critic = V2 verdict, human = V3, harness = deterministic machinery."
+          },
+          "review_tier": { "enum": ["R0", "R1", "R2", "R3"] },
+          "v_class": { "enum": ["V0", "V1", "V2", "V3"] },
+          "model_tier": {
+            "enum": ["haiku", "sonnet", "opus", "fable"],
+            "description": "Compute tier the actor ran at (§3.6). Optional until all executors emit it."
+          },
+          "note": { "type": "string" }
+        }
+      }
+    },
+
     "classification_calibration": {
       "type": "object",
       "description": "The classification-observer corpus (§7 classification calibration) — the record-and-match signal for the V-class and M-class dials. TRUTH-SOURCE ASYMMETRY (§2.2/§2.3) is enforced by the `may_lower` flags: a critic/auditor opinion may only license RAISING a class or flagging for the human; only a human_diff or machine_check may license LOWERING one. The matcher that consumes this corpus is deferred until same-version N is large (evolution.md).",
       "additionalProperties": false,
       "properties": {
         "mission_class_assigned": { "enum": ["M0", "M1", "M2"] },
+        "mission_class_assigned_note": { "type": "string", "description": "Classifier-floor vs final class rationale (e.g. judgment raises per §2.4)." },
         "mission_class_verdict": {
           "type": ["object", "null"],
           "additionalProperties": false,
@@ -69,7 +98,8 @@
               "v_class_assigned": { "enum": ["V0", "V1", "V2", "V3"] },
               "should_have_been": { "enum": ["V0", "V1", "V2", "V3"] },
               "evidence_source": { "enum": ["human_diff", "machine_check", "critic_opinion"] },
-              "may_lower": { "type": "boolean" }
+              "may_lower": { "type": "boolean" },
+              "note": { "type": "string" }
             }
           }
         }
@@ -95,13 +125,13 @@
         },
         "cap_hits": {
           "type": "array",
-          "description": "Every node that hit a cap. The audit's later judgment (would_have_converged) is the calibration signal.",
+          "description": "Every node that hit a cap — AND every mission-level budget-ceiling hit (§6 dual ceiling: use node \"mission\" with cap token_budget or agent_budget). A breach that only appears as report prose is invisible to calibration; it MUST land here. The audit's later judgment (would_have_converged) is the calibration signal.",
           "items": {
             "type": "object",
             "required": ["node", "cap", "limit", "used"],
             "properties": {
-              "node": { "type": "string" },
-              "cap": { "enum": ["micro_loop_retries", "sub_loop_iterations", "subtree_replans", "plan_fight_rounds", "audit_cycles", "cold_swaps"] },
+              "node": { "type": "string", "description": "Node id, or the sentinel \"mission\" for mission-level budget caps." },
+              "cap": { "enum": ["micro_loop_retries", "sub_loop_iterations", "subtree_replans", "plan_fight_rounds", "audit_cycles", "cold_swaps", "token_budget", "agent_budget"] },
               "limit": { "type": "integer" },
               "used": { "type": "integer" },
               "would_have_converged": {
@@ -119,7 +149,10 @@
       "additionalProperties": false,
       "properties": {
         "ac_nodes": { "type": "integer" },
+        "brief_critic_findings": { "type": "string", "description": "GRILL-phase brief-critic summary line." },
+        "fight": { "type": "string", "description": "FIGHT-phase summary line (lenses, rounds, blockers/majors/minors, waivers)." },
         "blockers_raised": { "type": "integer" },
+        "blockers_raised_execute": { "type": "integer" },
         "blockers_escalated_to_human": { "type": "integer" },
         "majors_accepted_with_reason": {
           "type": "array",
@@ -132,6 +165,93 @@
             }
           }
         }
+      }
+    },
+
+    "compute_tiers": {
+      "type": "object",
+      "description": "§3.6 model-tier telemetry: the FREEZE histogram, recorded as-executed. Validates each tier on evidence (§7) — a cheap tier that leaks defects past its gate tightens on the next calibration.",
+      "additionalProperties": false,
+      "properties": {
+        "actor_tier_histogram": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "haiku": { "type": "integer" },
+            "sonnet": { "type": "integer" },
+            "opus": { "type": "integer" },
+            "fable": { "type": "integer" }
+          }
+        },
+        "gates": { "type": "string", "description": "Tier the gating critics / cold verifier ran at (constitution floor: strongest)." },
+        "floored_up": {
+          "type": "array",
+          "description": "Below-floor requests the executor floored up (§3.6) — each is a planner-calibration signal.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "node": { "type": "string" },
+              "requested": { "enum": ["haiku", "sonnet", "opus", "fable"] },
+              "floored_to": { "enum": ["haiku", "sonnet", "opus", "fable"] }
+            }
+          }
+        }
+      }
+    },
+
+    "r_tier_escape_outcomes": {
+      "type": "array",
+      "description": "§7 escape-rate telemetry per review tier: did a defect pass this node's review and get caught later (or never)? The evidence that validates/invalidates each R-tier assignment.",
+      "items": {
+        "type": "object",
+        "required": ["node", "review_tier", "escape"],
+        "additionalProperties": false,
+        "properties": {
+          "node": { "type": "string" },
+          "review_tier": { "type": "string", "description": "R0-R3; combined ladders allowed (e.g. \"R2/R3\" when a panel followed a cold-eye)." },
+          "escape": {
+            "type": "string",
+            "description": "Free-form but prefer the vocabulary: none | yes-caught-downstream | yes-caught-at-audit | yes-escaped-to-delivery."
+          },
+          "note": { "type": "string" }
+        }
+      }
+    },
+
+    "escalation_precision": {
+      "type": "object",
+      "description": "§3.3 escalation-precision telemetry: of the blockers escalated to the human, how many were legit vs noise? legit/noise stay null until /mission-log-audit fills them from the human verdicts.",
+      "additionalProperties": false,
+      "properties": {
+        "escalated": { "type": "integer" },
+        "legit": { "type": ["integer", "null"] },
+        "noise": { "type": ["integer", "null"] }
+      }
+    },
+
+    "budget_planned_vs_actual": {
+      "type": "object",
+      "description": "§6 mission budget (dual ceiling, frozen at PLAN) vs actual. exhausted=true means graceful convergence was triggered. Any overrun MUST also appear in plan_vs_executed.cap_hits (node \"mission\").",
+      "additionalProperties": false,
+      "required": ["token_budget", "tokens_spent", "agent_budget", "agents_spawned"],
+      "properties": {
+        "token_budget": { "type": "integer" },
+        "tokens_spent": { "type": "integer" },
+        "agent_budget": { "type": "integer" },
+        "agents_spawned": { "type": "integer" },
+        "exhausted": { "type": "boolean" },
+        "note": { "type": "string", "description": "Planned-vs-actual commentary (e.g. FIGHT estimate accuracy) — a calibration signal for the feasibility lens." }
+      }
+    },
+
+    "audit": {
+      "type": "object",
+      "description": "AUDIT-phase summary: what was re-run / sampled and the outcome. Lenient sub-shape — the audit narrative varies by mission class.",
+      "additionalProperties": true,
+      "properties": {
+        "depth": { "type": "string" },
+        "all_passed": { "type": "boolean" },
+        "escapes": { "type": "integer" }
       }
     },
 
