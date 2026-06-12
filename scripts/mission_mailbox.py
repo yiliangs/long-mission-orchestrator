@@ -3,14 +3,14 @@
 Outbound (skills invoke these):
   report <run-id>      email .mission/<run-id>/REPORT.md  (the four-signal morning report, §12)
   walkthrough <file>   email a /mission-log-audit decision walk-through
-  proposal <id>        email proposals/<id>.md            (an /evolve amendment batch)
+  proposal <id>        email proposals/<id>.md            (an evolution amendment batch)
 
 Inbound (cron):
   poll                 authenticate replies and route the Human's feedback (§7 active intake)
 
 A reply is captured by a CONSTRAINED Claude agent (deterministic shell, smart core — §1.3): it
 writes verdicts into the fieldnotes run-record and, only when the reply carries the shared-secret
-GRANT token, applies an amendment via `/evolve apply`. The §9 perimeter (no merge-to-default, no
+GRANT token, applies an amendment per docs/evolve.md. The §9 perimeter (no merge-to-default, no
 force-push, no outward comms, no secrets) is enforced by a deny-list even under bypass — the auth
 gate + token are what authorize a human-only action over email.
 """
@@ -161,9 +161,10 @@ The Human's reply (verbatim):
 ---
 
 Grant status: {grant}.
-- If GRANTED: the Human authorizes applying this amendment. Run `/evolve apply {ref}` — apply the \
-granted edits to `docs/agent-constitution.md` (or the §6.2 cap table), bump the version, commit \
-`evolve: constitution ...`, run `scripts/deploy`. Then confirm.
+- If GRANTED: the Human authorizes applying this amendment. Follow the Apply section of \
+`~/.claude/docs/evolve.md` — apply the granted edits to `docs/agent-constitution.md` (or the \
+§6.2 cap table), bump the version, commit `evolve: constitution ...`, run `scripts/deploy`. \
+Then confirm.
 - If NOT GRANTED: do NOT apply anything. Append the Human's comment under a `## Human response` \
 heading in `proposals/{ref}.md`, commit it, and report back.
 
@@ -230,7 +231,7 @@ def main() -> None:
     p.add_argument("--ref", help="thread ref (default: file stem)")
     p.set_defaults(func=cmd_walkthrough)
 
-    p = sub.add_parser("proposal", help="email an /evolve proposal")
+    p = sub.add_parser("proposal", help="email an evolution proposal")
     p.add_argument("id")
     p.add_argument("--file", help="explicit proposal path (default proposals/<id>.md)")
     p.set_defaults(func=cmd_proposal)

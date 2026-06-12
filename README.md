@@ -109,11 +109,11 @@ long-mission-orchestrator/
 ├── docs/
 │   ├── agent-constitution.md       # THE rules — read first
 │   ├── operating-card.md           # the ~1.5 KB worker brief
-│   └── evolution.md                # how it improves itself
+│   ├── evolution.md                # how it improves itself
+│   └── evolve.md                   # evolution procedure (internal; demoted from /evolve at 0.3.4)
 ├── schema/                         # plan.json, run-record, cap-log formats
 ├── skills/
 │   ├── mission.md                  # /mission — run a mission
-│   ├── evolve.md                   # /evolve — self-improvement review
 │   └── mission-log-audit.md        # /mission-log-audit — surface decisions to you
 ├── executors/
 │   ├── mission-executor.workflow.js  # Claude Code adapter (the reference runtime)
@@ -123,7 +123,7 @@ long-mission-orchestrator/
 │   ├── mailbridge.py               # §12 email transport (proven plaid-finance channel, standalone)
 │   ├── mission_mailbox.py          # report/walkthrough/proposal out; poll + route feedback in
 │   └── deploy.ps1 / deploy.sh      # install operative files into ~/.claude
-└── proposals/                      # /evolve amendment drafts awaiting grant
+└── proposals/                      # evolution amendment drafts awaiting grant
 ```
 
 Three places, never mixed: **governance** (this repo), **telemetry** (a fieldnotes repo holds
@@ -156,7 +156,7 @@ audit, the operating-card split, the cold-improver→revision loop, the blast-ra
 **The §12 email channel is wired** (`scripts/mailbridge.py` + `scripts/mission_mailbox.py`,
 deployed to `~/.claude/scripts/`): a mission emails REPORT.md / decision walk-throughs / proposals,
 and an authenticated reply is polled (`LMO\MailboxPoll`) and routed into the fieldnotes run-record
-(verdicts) or `/evolve apply` (token-gated grants) — the proven plaid-finance transport, governed
+(verdicts) or the amendment-apply procedure (token-gated grants, docs/evolve.md) — the proven plaid-finance transport, governed
 by the §9 perimeter via a deny-list. Config lives at `~/.claude/mailbridge.env` (machine-local).
 
 **Specified but not yet wired:** subtree replan, the §3.3 gate-critic rebuttal, the

@@ -3,6 +3,34 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.4] — 2026-06-12
+
+Surface-contraction release, from the Human's first principle: **the feedback surface is
+exactly two channels** — one passive (the two-way §12 email loop), one active
+(`/mission-log-audit`). Everything else is internal machinery.
+
+### Added
+- **§12 two-channel principle** — codified as the opening of the Reporting section; a third
+  human-facing feedback surface is a design defect, not a feature.
+- **§7 post-session talk is intake** — when the Human raises a mission-attributable issue in
+  conversation after delivery (a role that didn't do its job), that conversation is amendment
+  evidence with the same standing as an email verdict: captured into the run-record at the
+  time, allowed to seed proposals. Strictly scoped to talk about the mission's work.
+  (0.3.3 and 0.3.4 were both born this way.)
+- **`/mission --resume <run-id>`** — manual recovery of a dead mission. Re-enters the
+  orchestrator at EXECUTE (never the bare executor, which would skip AUDIT/DELIVER and
+  produce an unreported mission): one-driver check against the §11 heartbeat, completed-node
+  frontier reconstructed from committed evidence only, executor dispatched with its
+  documented `args.completed` resume contract.
+
+### Changed
+- **`/evolve` demoted from command to internal procedure** (`skills/evolve.md` →
+  `docs/evolve.md`; removed from `~/.claude/commands/`). Evidence: three constitution
+  amendments shipped this week, none via /evolve — the live amendment path is conversation
+  under §13. What remains real is machinery, not a command: Tier-2 calibrate now fires from
+  the `/mission-log-audit` cadence when due; `apply` fires from the email GRANT router. The
+  human command surface is now /mission (work) + /mission-log-audit (review).
+
 ## [0.3.3] — 2026-06-12
 
 Reader-side protocol release, driven by the Human's review of the first live §12 email

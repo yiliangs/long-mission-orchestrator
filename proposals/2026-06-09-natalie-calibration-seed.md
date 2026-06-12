@@ -1,6 +1,11 @@
-# Calibration-corpus seed #1 — natalie Block/ run (DRAFT, awaiting your confirmation)
+# Calibration-corpus seed #1 — natalie Block/ run (WRITTEN to fieldnotes 2026-06-12)
 
-Status: **drafted for review — not written to fieldnotes.** This is the first
+Status: **written to fieldnotes** — `mission_records/block-hygiene-20260608.json
+classification_calibration`, via /mission-log-audit 2026-06-12 after the Human's blanket
+agreement on the 06-11 walkthrough. Entries landed as `should_have_been:"V3"` (schema enum;
+the V1-with-harness nuance is in each entry's `note`), `evidence_source:"critic_opinion"`
+(the 06-12 human-diff showed *no* V2-gate miss, so per the upgrade rule below no `human_diff`
+upgrade was licensed), `may_lower:false`. Kept here as provenance. This is the first
 `classification_calibration` data point (§7), drawn from the natalie daylight mission
 (run `a11bb840…`). It is **critic-evidence only**, so every `may_lower` is `false`: a critic's
 opinion may flag/raise a class but can **never** authorize lowering one (§2.2 asymmetry). To

@@ -45,7 +45,7 @@ mission-caps.jsonl  ──filter by constitution_version──▶  per-cap stats
                                                           (p95 used, %-hit, would-converge rate)
         │
         ▼
-/evolve calibrate  ──▶  proposed diff to §6.2 cap table  ──▶  you approve  ──▶  version bump + redeploy
+Tier-2 calibrate  ──▶  proposed diff to §6.2 cap table  ──▶  you approve  ──▶  version bump + redeploy
 ```
 
 Most of this is deterministic arithmetic over the jsonl; the model only judges the margins.
@@ -109,7 +109,7 @@ Patterns → proposals (examples):
 
 ## Why "evolution is itself a mission"
 
-`/evolve` runs through the same plan → critic-fight → audit protocol. Consequences that fall
+The evolution review (docs/evolve.md — internal procedure, demoted from `/evolve` at 0.3.4) runs through the same plan → critic-fight → audit protocol. Consequences that fall
 out for free:
 - the evolution proposal gets **adversarially critiqued** before you see it (a critic that
   refutes weak amendments);
@@ -147,18 +147,18 @@ out for free:
 3. **Perimeter off-limits** — §9 clauses (blast radius, merge authority, blocker waiver,
    verification floors, confidentiality) are never in an autonomous batch; a proposal
    touching them is flagged `PERIMETER` and waits for you directly.
-4. **Human merge, always** — `/evolve` proposes; you apply. No exception.
+4. **Human merge, always** — the evolution pass proposes; you apply. No exception.
 
 ## Triggering (automated generation, granted application)
 
 The cycle runs in the background; you only enter at the grant step.
 
 ```
-schedule fires ──▶ /evolve generates batch ──▶ writes proposals/<id>.md ──▶ EMAILS you
+audit cadence fires ──▶ evolution pass generates batch ──▶ writes proposals/<id>.md ──▶ EMAILS you
                                                                               │
                                           you reply / comment / grant ◀───────┘
                                                    │
-                                  /evolve apply <id> ──▶ edit constitution, bump version,
+                                  GRANT router applies <id> ──▶ edit constitution, bump version,
                                                           commit, deploy, confirm by email
 ```
 
@@ -174,5 +174,5 @@ constitution change on a timer is the failure mode the perimeter prevents; a sys
 *drafts and emails* one is just doing its homework. The loop is closed by evidence,
 gated by you.
 
-**Activation is deferred until run-records exist** (post Phase 1). `/evolve` over an empty
+**Activation is deferred until run-records exist** (post Phase 1). an evolution pass over an empty
 corpus has nothing to propose.

@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.3
+**Version:** 0.3.4
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -453,8 +453,8 @@ close, audits what exists, and reports `DIVERGED(budget)` — never a mid-node k
 ### 6.4 Cost
 
 Verification is where the budget goes — parallel actors each shadowed by a critic, 3-lens
-panels on the final deliverable, audit re-running checks, and `/evolve` being itself a
-mission. The economics lever is **adaptive depth = the V-ladder**: V0/V1 verify for near-zero
+panels on the final deliverable, audit re-running checks, and the evolution review being
+itself a mission. The economics lever is **adaptive depth = the V-ladder**: V0/V1 verify for near-zero
 (one check command), single-critic is the V2 default, and 3-lens panels are reserved for the
 final deliverable and the plan-fight. Spend verification where the oracle is weak, not
 uniformly. A run that cannot afford its own verification narrows scope — it does **not** skip
@@ -580,10 +580,19 @@ merge authority at every tier above the first.
   pending** — attention is never spent on an empty review. This inverts the feedback economics:
   the system batches what it needs and pulls it to the Human, who answers when free, rather than
   depending on the Human to initiate.
-- **Implementation:** `docs/evolution.md` (data backbone + loop mechanics), the `/evolve`
-  skill (Tier-2 calibrate / Tier-3 evolve, runs as a mission), `/mission-log-audit` (scans the
-  log, surfaces decisions, captures the human-diff gold signal), and the record schemas
-  (`schema/mission-record.schema.json`, `schema/cap-log.format.md`).
+- **Post-session talk is intake too (the post-self-auditing service).** When the Human, in
+  conversation after a mission, raises an issue **directly attributable to the mission's work**
+  — a role that didn't do its job (a classification missed, a critic that passed a defect, a
+  report that hid a decision) — that conversation IS amendment evidence, same standing as an
+  email verdict: capture it into the relevant run-record / decision feedback at the time, and
+  let it seed proposals. Scope is strict: only talk *about the mission's work* counts; general
+  conversation is not telemetry. (Releases 0.3.3 and 0.3.4 were both born exactly this way.)
+- **Implementation:** `docs/evolution.md` (data backbone + loop mechanics), the evolution
+  procedure `docs/evolve.md` (Tier-2 calibrate / Tier-3 evolve, runs as a mission — invoked
+  by the audit cadence and the email GRANT router, **not a human command**),
+  `/mission-log-audit` (scans the log, surfaces decisions, captures the human-diff gold
+  signal), and the record schemas (`schema/mission-record.schema.json`,
+  `schema/cap-log.format.md`).
 
 ---
 
@@ -684,6 +693,14 @@ mission. Mechanism: an **orchestrator-armed heartbeat**, not a standing job.
 ---
 
 ## 12. Reporting
+
+**The feedback surface is exactly two channels (first principle, set by the Human).** One
+**passive**: the two-way email loop — reports, walk-throughs, and proposals go out; verdicts,
+comments, and GRANTs come back, authenticated and routed into the records. One **active**:
+`/mission-log-audit`, for when the Human wants to audit proactively. Nothing else is a
+human-facing feedback surface — evolution machinery (`docs/evolve.md`), the executor, the
+verdict router are all internal callees of these two channels. A third surface is a design
+defect, not a feature.
 
 Four unambiguous morning signals, so silence is never confused with progress:
 

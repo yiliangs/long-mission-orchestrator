@@ -1,9 +1,10 @@
----
-description: Run a self-evolution review — calibrate caps (Tier 2) or amend rules (Tier 3) from accumulated run-records. Runs scheduled in the background; emails proposals for async grant.
-argument-hint: [calibrate | evolve | apply <proposal-id>] [--since <run-id>]
----
+# Evolution procedure (internal — not a human command)
 
-# /evolve
+> **Demoted from `/evolve` (constitution 0.3.4).** The Human's feedback surface is exactly
+> two channels (§12): the passive two-way **email loop** and the active **`/mission-log-audit`**
+> command. This document is the procedure those channels invoke — Tier-2 `calibrate` and
+> Tier-3 `evolve` generation fire from the audit cadence; `apply` fires from the email GRANT
+> router (`mission_mailbox.py`). A human typing commands at it is not a supported entry point.
 
 The framework improving itself (constitution §7). **This review is itself a mission** — it
 goes through plan → critic-fight → audit like any other, and its deliverable is a batch of
@@ -16,7 +17,7 @@ keeps the perimeter intact: **generating a proposal is automated** (proposing is
 safe), but **applying an amendment always waits for your grant** — a system never rewrites its
 own constitution ungranted (§9).
 
-Two tiers, selected by `$ARGUMENTS` (default: `calibrate`):
+Two tiers (default: `calibrate`):
 
 ## Tier 2 — `calibrate` (every ~10 missions)
 
@@ -66,7 +67,7 @@ and a predicted effect.
    fine ("take 1 and 3, drop 2"). A reply carrying the shared `GRANT_SECRET` is polled by
    `LMO\MailboxPoll` and triggers step 5 automatically; a reply *without* it is recorded as a
    comment and applies nothing (the secret is what authorizes a §9 human-only action over email).
-5. **Apply (`/evolve apply <proposal-id>`).** On your grant, apply the granted edits to
+5. **Apply (the GRANT router invokes this section).** On your grant, apply the granted edits to
    `docs/agent-constitution.md` (or §6.2 cap table), **bump the version**, commit
    (`evolve: constitution vX.Y -> vX.Z`), run `scripts/deploy`, and confirm by email. The
    version bump is what keeps future records comparable. Ungranted or PERIMETER-without-
@@ -77,8 +78,6 @@ and a predicted effect.
 - **Tier 2 `calibrate`** runs on a schedule keyed to mission volume (fires when the
   `mission-caps.jsonl` line count since the last calibration crosses ~10).
 - **Tier 3 `evolve`** runs on a calendar cadence (e.g. monthly, or post-venue-milestone).
-- Both are wired as background routines (Claude Code Routine / Task Scheduler) that invoke
-  this skill headless, generate, and email. **Activation is deferred until run-records
-  exist** (post Phase 1) — an `/evolve` with an empty corpus has nothing to propose.
+- Both are wired as background routines (Claude Code Routine / Task Scheduler) that run this procedure headless, generate, and email. **Activation is deferred until run-records
+  exist** (post Phase 1) — an evolution pass over an empty corpus has nothing to propose.
 
-$ARGUMENTS

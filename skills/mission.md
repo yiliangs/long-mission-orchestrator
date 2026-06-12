@@ -271,7 +271,12 @@ Then **deliver**:
   R-tier escape outcomes** (did AUDIT/punchlist catch a defect the node's review tier missed?)
   in the run-record — this is the telemetry that calibrates class budget defaults, the V→R floor
   table, and the §3.6 model floors (a cheap tier that leaks defects past its gate tightens) (§7).
-- Append cap stats to `mission-caps.jsonl` (fieldnotes).
+- Append a cap-stats line to `mission-caps.jsonl` (fieldnotes), **conforming to
+  `schema/cap-log.format.md`**. Every line MUST carry `run_id` **and `constitution_version`**
+  (the version governing this run — read it from the `**Version:**` header of
+  `docs/agent-constitution.md`). The Tier-2 calibration loop (§7) partitions strictly by
+  `constitution_version` and is **blind to any line that omits it** — an unstamped line is
+  silently dropped, not counted. Lines with no cap hits still get written (`cap_hits: []`).
 - **Validate before sending (hard step, §12):** run
   `python ~/.claude/scripts/validate_record.py ~/.claude/docs/mission-record.schema.json <record>`
   and the same against `mission-report.schema.json` for `report.json` — exit 0 or fix the

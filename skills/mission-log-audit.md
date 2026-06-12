@@ -43,8 +43,11 @@ attention; a review that surfaces nothing is worse than none (mirrors §3.3 esca
 3. **Classification-calibration entries with `may_lower:false`** awaiting human evidence (§7) — the
    Human's verdict is the *only* thing that can authorize a down-classification (§2.2 asymmetry).
 4. **Open decisions / forks** flagged `NEEDS-HUMAN` in run-records or `proposals/`.
-5. **Tier-2 cap-calibration due** (≥10 missions since last, §7) and any **PERIMETER** proposals
-   (§9) — Human-only, never in an autonomous batch.
+5. **Tier-2 cap-calibration due** (≥10 missions since last, §7) — when due, **run** the
+   calibrate procedure (`~/.claude/docs/evolve.md`, Tier 2) as part of this audit and include
+   the proposed cap diff as a walk-through item (this skill is the cadence that fires it; there
+   is no separate human command). Any **PERIMETER** proposals (§9) — Human-only, never in an
+   autonomous batch.
 
 Dedupe against already-decided items so nothing is surfaced twice.
 
@@ -76,7 +79,11 @@ Record each verdict where it belongs — actively, not awaited:
   (`confirmed_by_human: true` once the Human rules);
 - classification verdicts → `classification_calibration` (`evidence_source:"human_diff"`, and
   `may_lower` exactly as the Human rules — a critic opinion never can);
-- accepted amendments → hand to `/evolve`;
+- accepted amendments → apply per `~/.claude/docs/evolve.md` (internal procedure — the Human's
+  surface is this command + the email loop, §12);
+- **in-session post-mission talk counts** (§7): when the Human raises a mission-attributable
+  issue in conversation, capture it into the run-record then and there — don't wait for the
+  next audit cycle to re-ask;
 - merge decisions stay the Human's (§9.2) — this skill never merges.
 
 ## Maker/checker

@@ -19,10 +19,13 @@ cp "$repo/schema/mission-report.schema.json"   "$claude/docs/mission-report.sche
 cp "$repo/schema/cap-log.format.md"            "$claude/docs/cap-log.format.md"
 cp "$repo/executors/mission-executor.codex.md" "$claude/docs/mission-executor.codex.md"
 
-# Skills -> commands/
+cp "$repo/docs/evolve.md"              "$claude/docs/evolve.md"
+
+# Skills -> commands/  (the Human's surface is two channels: email + /mission-log-audit;
+# /mission runs the work. evolve.md is an internal procedure in docs/, NOT a command.)
 cp "$repo/skills/mission.md"        "$claude/commands/mission.md"
-cp "$repo/skills/evolve.md"         "$claude/commands/evolve.md"
 cp "$repo/skills/mission-log-audit.md" "$claude/commands/mission-log-audit.md"
+rm -f "$claude/commands/evolve.md"   # demoted 0.3.4
 
 # Workflow executor -> workflows/
 cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-executor.workflow.js"

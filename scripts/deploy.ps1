@@ -17,11 +17,13 @@ Copy-Item "$repo\schema\mission-record.schema.json"     "$claude\docs\mission-re
 Copy-Item "$repo\schema\mission-report.schema.json"     "$claude\docs\mission-report.schema.json"       -Force
 Copy-Item "$repo\schema\cap-log.format.md"              "$claude\docs\cap-log.format.md"                -Force
 Copy-Item "$repo\executors\mission-executor.codex.md"   "$claude\docs\mission-executor.codex.md"        -Force
+Copy-Item "$repo\docs\evolve.md"                        "$claude\docs\evolve.md"                        -Force
 
-# Skills -> commands/
+# Skills -> commands/  (the Human's surface is two channels: email + /mission-log-audit;
+# /mission runs the work. evolve.md is an internal procedure in docs/, NOT a command.)
 Copy-Item "$repo\skills\mission.md"          "$claude\commands\mission.md"         -Force
-Copy-Item "$repo\skills\evolve.md"           "$claude\commands\evolve.md"          -Force
 Copy-Item "$repo\skills\mission-log-audit.md"   "$claude\commands\mission-log-audit.md"  -Force
+Remove-Item "$claude\commands\evolve.md" -ErrorAction SilentlyContinue   # demoted 0.3.4
 
 # Workflow executor -> workflows/
 Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\mission-executor.workflow.js" -Force
@@ -42,6 +44,6 @@ Copy-Item "$repo\scripts\mailbridge.env.example" "$claude\scripts\mailbridge.env
 
 Write-Host "Deployed long-mission-orchestrator -> $claude"
 Write-Host "  docs/      agent-constitution, schemas, codex adapter"
-Write-Host "  commands/  /mission /evolve /mission-log-audit"
+Write-Host "  commands/  /mission /mission-log-audit  (evolve demoted to docs/ at 0.3.4)"
 Write-Host "  workflows/ mission-executor.workflow.js"
 Write-Host "  scripts/   classify-mission, mailbridge + mission_mailbox (email channel)"
