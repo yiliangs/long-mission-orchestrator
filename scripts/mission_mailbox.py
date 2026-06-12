@@ -131,7 +131,15 @@ Record the Human's verdict into `mission_records/{ref}.json` (§7 — the human-
 if they said whether they accept/merge. If they gave a classification verdict, also fill \
 `classification_calibration`, respecting the §2.2 truth-source asymmetry (a human verdict may lower \
 OR raise a class — set `may_lower` accordingly). Never invent a verdict the Human did not give.
-3. `git add` + commit `mission-record: {ref} human_review` + `git push`.
+3. **Fan out**: if `{ref}` is a walk-through / audit thread (not a single run) or the reply rules on \
+items belonging to OTHER runs, ALSO write each per-run verdict into THAT run's \
+`mission_records/<run-id>.json` `human_review` block — the calibration matcher reads per-run records, \
+not thread records. A blanket "agree" is recorded on the thread record only; never expand it into \
+per-run verdicts.
+4. **Validate every record you touched**: \
+`python ~/.claude/scripts/validate_record.py ~/.claude/docs/mission-record.schema.json <file...>` \
+— fix violations before committing (legacy 0.1 records warn only; do not fail on those warnings).
+5. `git add` + commit `mission-record: {ref} human_review` + `git push`.
 
 PERIMETER (§9, hard): never merge to a default branch, never force-push, never touch .env/secrets, \
 never post outward (issues/PRs/comments). You only write telemetry into this repo. Anything else in \
