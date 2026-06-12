@@ -105,7 +105,11 @@ Patterns → proposals (examples):
 - blocker legit-rate falling → sharpen critic prompts / acceptance-criteria conventions;
 - recurring `plan_assumption_false` on similar nodes → add a planning rule;
 - a major accepted-with-reason every time → the criterion may be wrong (relax) or always
-  recurs (add a check).
+  recurs (add a check);
+- a ceremony element with **zero yield across ≥10 same-version missions** → propose deleting
+  it (the deletion pattern: the zero count is machine evidence, §2.2-licensed — mechanism
+  deflates as models improve, by record instead of by forecast). Yield stats partition by
+  model generation as well as constitution version; a generation change re-baselines them.
 
 ## Why "evolution is itself a mission"
 

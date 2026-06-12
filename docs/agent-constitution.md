@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.4
+**Version:** 0.3.5
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -11,6 +11,32 @@
 > behavior; the per-repo `## Agent contract` (§8) supplies repo-local facts. Precedence:
 > **explicit user instruction > repo contract > this constitution**, except that a repo
 > contract may only *tighten* the constitution, never loosen it.
+
+## 0. Two halves with opposite fates
+
+This document mixes two kinds of content, and they age differently. Naming which is which
+keeps future amendments honest about what they are touching.
+
+**0.1 The policy core — capability-invariant.** These hold for any model, however strong,
+because they are claims about *evidence and authority*, not about model skill: the V-ladder
+and truth-source asymmetry (§2 — self-report is testimony, not proof; a stronger model gives
+*more convincing* testimony, which makes the distinction more load-bearing, never less);
+close-time binding with recorded, re-executable checks (§2.1); the perimeter and the Human's
+merge/waiver monopoly (§9 — principal-agent machinery, and demand for it grows with every
+increase in what is delegated); evidence-class legibility in reporting (§12 — human attention
+is the binding constraint, and no model release adds hours to the morning); and the human-diff
+telemetry loop (§7). Amendments here change *what counts as known* — they deserve the most
+scrutiny and will not be obsoleted by a better model.
+
+**0.2 The mechanism — capability-tuned, expected to deflate.** Retry caps, the cold-improver
+pass, review-tier defaults, mission-class ceremony sizing, fresh-context spawning, the cap
+table (§6.2): these compensate for present-day model failure modes and are *supposed to
+shrink* as models improve — via the calibration loop's evidence, not via forecast. The
+deletion pattern (docs/evolve.md: zero yield across ≥10 same-version missions → removal
+proposal, machine-evidenced) is the sanctioned path down. A future where most missions run
+M0/M1 with V0/V1 nodes closing on checks and critics rarely spawning is this document
+*succeeding*, not failing. What §0.2 must never do on the way down is bypass §0.1: less
+ceremony never means less evidence.
 
 ---
 

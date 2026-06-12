@@ -45,6 +45,19 @@ Reads the full run-records, not just caps. Looks for **patterns that justify rul
   rule or a contract-template field that pre-empts it.
 - **Accepted-major patterns** — the same major repeatedly accepted-with-reason → maybe it
   isn't a defect; propose relaxing the criterion. Or it always recurs → propose a check.
+- **Zero-yield ceremony (the deletion pattern)** — a ceremony element (a critic tier, the
+  cold-improver pass, a retry loop, the cold-swap) that produced **no findings and no caught
+  defects across ≥10 same-version missions** is a removal candidate: propose deleting or
+  default-off-ing it. The zero count is **machine evidence** (read deterministically from the
+  records), so §2.2 licenses the down-ratchet — this is how the framework sheds mechanism
+  the models have outgrown, by record instead of by forecast. Ceremony must pay rent in
+  yield. The policy core (V-ladder, close-time binding, perimeter, evidence-class reporting,
+  human-diff loop) is exempt — it is not ceremony (constitution §0.1).
+- **Capability re-baseline** — on a model-generation change (e.g. Opus→Fable as default
+  actor/gate), prior yield statistics are STALE: a pass kept alive by catches an older model
+  needed may be dead weight for the new one. Partition yield stats by model generation
+  exactly as records are partitioned by constitution version; never carry a ceremony element
+  across a generation on the strength of old-generation catches alone.
 
 Each proposal carries: the claim, the **run-record ids that evidence it**, the exact edit,
 and a predicted effect.

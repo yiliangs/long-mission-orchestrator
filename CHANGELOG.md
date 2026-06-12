@@ -3,6 +3,25 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.5] — 2026-06-12
+
+Self-knowledge release, from a second external audit ("does this deserve to live now that
+Fable one-shots?"). The audit's survival analysis was adopted; its prescription (compress
+now) was rejected as forecast-driven — by the repo's own epistemology, shedding is licensed
+by records, not essays.
+
+### Added
+- **Constitution §0 "Two halves with opposite fates"** — names the capability-invariant
+  policy core (V-ladder + truth-source asymmetry, close-time binding, perimeter,
+  evidence-class reporting, human-diff loop) vs the capability-tuned mechanism (caps, retry
+  loops, improver passes, tier/class ceremony defaults) that is *expected to deflate* via
+  calibration. Less ceremony never means less evidence.
+- **The deletion pattern (docs/evolve.md, docs/evolution.md)** — Tier-3 previously only knew
+  how to tighten; now: a ceremony element with zero yield across ≥10 same-version missions is
+  a machine-evidenced removal candidate (§2.2-licensed down-ratchet). Plus a capability
+  re-baseline rule: yield stats partition by model generation; a generation change stales
+  them — never keep ceremony alive on catches an older model needed.
+
 ## [0.3.4] — 2026-06-12
 
 Surface-contraction release, from the Human's first principle: **the feedback surface is
