@@ -50,6 +50,10 @@
             "enum": ["haiku", "sonnet", "opus", "fable"],
             "description": "Compute tier the actor ran at (§3.6). Optional until all executors emit it."
           },
+          "escape": {
+            "type": "string",
+            "description": "Inline per-node escape outcome (same vocabulary as r_tier_escape_outcomes.escape); use either surface, not both."
+          },
           "note": { "type": "string" }
         }
       }
