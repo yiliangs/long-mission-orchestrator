@@ -44,6 +44,10 @@
             "enum": ["check", "critic", "human", "harness"],
             "description": "What closed the node: check = V0/V1 closure record, critic = V2 verdict, human = V3, harness = deterministic machinery."
           },
+          "check_source": {
+            "enum": ["registry", "ad-hoc"],
+            "description": "For check-closed nodes: was the bound check named in the repo contract's verifier registry, or composed by the actor? Ad-hoc closures are force-included in the AUDIT sample (§2.1) — check-adequacy telemetry."
+          },
           "review_tier": { "enum": ["R0", "R1", "R2", "R3"] },
           "v_class": { "enum": ["V0", "V1", "V2", "V3"] },
           "model_tier": {

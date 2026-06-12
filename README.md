@@ -146,21 +146,41 @@ Copies the constitution, operating card, and schemas into `~/.claude/docs/`, ski
 
 ---
 
-## Status (v0.2, pre-first-mission)
+## Status (v0.3.x, post-daylight)
+
+**Missions have run.** As of 2026-06-12 the fieldnotes corpus holds 8 schema-validated
+run-records: one v0.1 daylight mission (natalie `block-hygiene-20260608`, 17 agents, DELIVERED,
+merged), four v0.3.1 runs (an overnight M2 web-UI port, a paper submission audit, a natalie
+transition pair), and the audit/walkthrough threads. The §7 human-diff loop is live end-to-end:
+reports emailed, human verdicts captured by authenticated reply, corrective-vs-non-corrective
+splits machine-computed (`scripts/diff_overlap.py`) and human-confirmed. Small corpus, real
+data — the Tier-2 cap calibration ran and correctly no-op'd on it.
 
 The reference executor (`mission-executor.workflow.js`) implements: the wave-based DAG walk,
-close-time binding, the micro-loop retry, the actor→critic→adjudicate gate, mission-class–scaled
-audit, the operating-card split, the cold-improver→revision loop, the blast-radius parallelism
-*decision*, and the deterministic class guard.
+close-time binding (with `check_source` registry/ad-hoc tagging), the micro-loop retry, the
+actor→critic→adjudicate gate (blocker citations deterministically resolved against the plan's
+named criteria), the R-tier review ladder, the dual mission budget, write-set breach enforcement
+at node close, mission-class–scaled audit (ad-hoc self-closures force-audited), the
+operating-card split, the cold-improver→revision loop, blast-radius parallelism *decision*
+(glob-aware), and the deterministic class guard.
 
 **The §12 email channel is wired** (`scripts/mailbridge.py` + `scripts/mission_mailbox.py`,
 deployed to `~/.claude/scripts/`): a mission emails REPORT.md / decision walk-throughs / proposals,
 and an authenticated reply is polled (`LMO\MailboxPoll`) and routed into the fieldnotes run-record
-(verdicts) or the amendment-apply procedure (token-gated grants, docs/evolve.md) — the proven plaid-finance transport, governed
-by the §9 perimeter via a deny-list. Config lives at `~/.claude/mailbridge.env` (machine-local).
+(verdicts) or the amendment-apply procedure (token-gated grants, docs/evolve.md). The routing
+agents run under per-kind tool **allowlists** — untrusted reply text never meets an open-ended
+agent — with the §9 perimeter deny shapes kept as backstop. Config lives at
+`~/.claude/mailbridge.env` (machine-local).
 
-**Specified but not yet wired:** subtree replan, the §3.3 gate-critic rebuttal, the
-audit→punchlist→fix loop, the worktree fan-out, and full multi-round cold-reviewer rotation. No
-mission has run under v0.2, and the Codex adapter is a spec. Treat this as **a designed protocol
-with a partial reference runtime, not a finished engine** — stated plainly so the
-"deterministic shell" claim stays honest.
+**Specified but not yet wired:** the worktree fan-out (disjoint mutating nodes are computed and
+logged but still run serially), the §3.3 gate-critic rebuttal, full multi-round cold-reviewer
+rotation, and the Codex adapter (a spec). Treat this as **a designed protocol with a maturing
+reference runtime, not a finished engine** — stated plainly so the "deterministic shell" claim
+stays honest.
+
+**The honest pitch, narrower than the name:** today this is a *disciplined overnight draft
+generator with an audit trail*. Where checks are cheap (V0/V1) the framework is near-mechanical;
+where they aren't (V2), its real function is not correctness-assurance but **attention
+compression** — making model judgment legible, cited, and triaged so the human's morning review
+is minutes, not hours. The constitution already says this (§2: "V2 is judgment made legible, not
+machine-proven"); the growing record corpus will say whether it's worth the ceremony.

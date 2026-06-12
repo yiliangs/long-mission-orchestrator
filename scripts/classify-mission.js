@@ -16,13 +16,27 @@
 const V = { V0: 0, V1: 1, V2: 2, V3: 3 }
 const CEREMONY = { M0: 0, M1: 1, M2: 2 }
 
+// Glob-vs-glob overlap (mirrors the executor's _globOverlap). Substring matching missed e.g.
+// write_set "src/**/*.cs" vs zone "src/ui/" — a silent V2-floor bypass (ex-audit 2026-06-12).
+// Literal paths overlap iff equal or one dir-prefixes the other; wildcards compare static
+// directory prefixes. Errs toward overlap: a false hit raises ceremony, never lowers it.
+function globOverlap(a, b) {
+  const norm = s => String(s).replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '')
+  const wild = s => /[*?]/.test(s)
+  const stat = s => { const i = s.search(/[*?]/); const pre = s.slice(0, i); return pre.slice(0, pre.lastIndexOf('/') + 1) }
+  const x = norm(a), y = norm(b)
+  if (!wild(x) && !wild(y)) return x === y || x.startsWith(y + '/') || y.startsWith(x + '/')
+  const px = wild(x) ? stat(x) : x + '/', py = wild(y) ? stat(y) : y + '/'
+  return px.startsWith(py) || py.startsWith(px)
+}
+
 // The deterministic floor: the LEAST ceremony the plan's facts permit.
 function classFloor(plan) {
   const nodes = (plan && plan.nodes) || []
   if (nodes.length === 0) return 'M1'
   const vMax = nodes.reduce((m, n) => Math.max(m, V[n.v_class] != null ? V[n.v_class] : 2), 0)
   const zones = (plan && plan.deliverable_zones) || []
-  const matchesZone = w => zones.some(z => w === z || w.includes(z) || z.includes(w))
+  const matchesZone = w => zones.some(z => globOverlap(w, z))
   const touchesZone = nodes.some(n => Array.isArray(n.write_set) && n.write_set.some(matchesZone))
   const unknownReach = nodes.some(n => !Array.isArray(n.write_set)) // can't prove it avoids a zone
   if (vMax >= V.V3) return 'M2'                                     // human-only work ⇒ full machinery

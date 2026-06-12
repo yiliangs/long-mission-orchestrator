@@ -10,9 +10,10 @@ Inbound (cron):
 
 A reply is captured by a CONSTRAINED Claude agent (deterministic shell, smart core — §1.3): it
 writes verdicts into the fieldnotes run-record and, only when the reply carries the shared-secret
-GRANT token, applies an amendment per docs/evolve.md. The §9 perimeter (no merge-to-default, no
-force-push, no outward comms, no secrets) is enforced by a deny-list even under bypass — the auth
-gate + token are what authorize a human-only action over email.
+GRANT token, applies an amendment per docs/evolve.md. The router runs under a per-kind tool
+ALLOWLIST (untrusted reply text never meets an open-ended agent), with the §9 perimeter shapes
+(no merge-to-default, no force-push, no outward comms, no secrets) deny-listed as a backstop —
+the auth gate + token are what authorize a human-only action over email.
 """
 from __future__ import annotations
 
@@ -25,7 +26,28 @@ from pathlib import Path
 
 import mailbridge
 
-# §9 perimeter — shapes the router must never use, regardless of bypassPermissions (deny wins).
+# Router permissions: ALLOWLIST, not bypass+denylist. The reply body is untrusted input fed
+# to an agent — blacklisting an LLM's action space against injection is the wrong polarity
+# (ex-audit 2026-06-12). Each router gets only the tools its one job needs; anything else is
+# auto-denied in headless mode (no prompt, the agent works within the grant). The §9 deny
+# shapes are kept as a backstop — deny wins over allow.
+_ALLOW_VERDICT = [
+    "Read", "Glob", "Grep",
+    "Edit(mission_records/**)", "Write(mission_records/**)",   # telemetry only (cwd=fieldnotes)
+    "Bash(git pull:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git push:*)",
+    "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
+    "Bash(python:*)",                                          # validate_record.py / diff_overlap.py
+]
+_ALLOW_PROPOSAL = [
+    "Read", "Glob", "Grep",
+    "Edit(docs/**)", "Edit(schema/**)", "Edit(CHANGELOG.md)",  # the granted amendment (cwd=LMO)
+    "Edit(proposals/**)", "Write(proposals/**)",
+    "Bash(git pull:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git push:*)",
+    "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
+    "Bash(bash scripts/deploy.sh:*)", "Bash(sh scripts/deploy.sh:*)",
+    "Bash(python:*)", "Bash(node:*)",                          # validators / classifier
+]
+# §9 perimeter — shapes the router must never use even if an allow pattern would cover them.
 _DENY = [
     "Bash(git merge:*)", "Bash(git push --force:*)", "Bash(git push -f:*)",
     "Bash(git reset --hard:*)", "Bash(rm:*)", "Bash(rmdir:*)", "Bash(del:*)", "Bash(gh:*)",
@@ -96,8 +118,10 @@ def _route(kind: str, ref: str, reply: str, grant_ok: bool) -> str:
     if not claude:
         return "Router unavailable: the `claude` CLI is not on PATH."
     cwd, prompt = _router_plan(kind, ref, reply, grant_ok)
-    cmd = [claude, "-p", prompt, "--permission-mode", "bypassPermissions",
-           "--max-turns", "20", "--output-format", "text", "--disallowedTools", *_DENY]
+    allow = _ALLOW_PROPOSAL if kind == "proposal" else _ALLOW_VERDICT
+    cmd = [claude, "-p", prompt,
+           "--max-turns", "20", "--output-format", "text",
+           "--allowedTools", *allow, "--disallowedTools", *_DENY]
     try:
         r = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=ROUTER_TIMEOUT)

@@ -44,12 +44,25 @@ const ZONES = plan.deliverable_zones || []
 // the executor's own decisions (audit depth) run below what the plan's facts permit. The planner may
 // raise above the floor, never below it. Discrepancy is logged for the report.
 const _V = { V0: 0, V1: 1, V2: 2, V3: 3 }, _CEREMONY = { M0: 0, M1: 1, M2: 2 }
+// Glob-vs-glob overlap for write_set/zone comparisons (§6.5, §2.4). Substring matching missed
+// e.g. write_set "src/**/*.cs" vs zone "src/ui/" (a silent V2-floor bypass — ex-audit 2026-06-12).
+// Literal paths overlap iff equal or one dir-prefixes the other; wildcards compare their static
+// directory prefixes. Errs toward overlap: a false hit RAISES ceremony, never lowers it.
+function _globOverlap(a, b) {
+  const norm = s => String(s).replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '')
+  const wild = s => /[*?]/.test(s)
+  const stat = s => { const i = s.search(/[*?]/); const pre = s.slice(0, i); return pre.slice(0, pre.lastIndexOf('/') + 1) }
+  const x = norm(a), y = norm(b)
+  if (!wild(x) && !wild(y)) return x === y || x.startsWith(y + '/') || y.startsWith(x + '/')
+  const px = wild(x) ? stat(x) : x + '/', py = wild(y) ? stat(y) : y + '/'
+  return px.startsWith(py) || py.startsWith(px)
+}
 function _classFloor(p) {
   const ns = (p && p.nodes) || []; if (!ns.length) return 'M1'
   const vMax = ns.reduce((m, n) => Math.max(m, _V[n.v_class] != null ? _V[n.v_class] : 2), 0)
   const zones = (p && p.deliverable_zones) || []
   const touchesZone = ns.some(n => Array.isArray(n.write_set) &&
-    n.write_set.some(w => zones.some(z => w === z || w.includes(z) || z.includes(w))))
+    n.write_set.some(w => zones.some(z => _globOverlap(w, z))))
   const unknownReach = ns.some(n => !Array.isArray(n.write_set))
   if (vMax >= _V.V3) return 'M2'
   return (ns.length <= 2 && vMax <= _V.V1 && !touchesZone && !unknownReach) ? 'M0' : 'M1'
@@ -98,7 +111,7 @@ const _R = { R0: 0, R1: 1, R2: 2, R3: 3 }
 function reviewFloor(node, selfClosed) {
   if (node.is_final_deliverable) return 'R3'
   const touchesZone = Array.isArray(node.write_set) &&
-    node.write_set.some(w => ZONES.some(z => w === z || w.includes(z) || z.includes(w)))
+    node.write_set.some(w => ZONES.some(z => _globOverlap(w, z)))
   if (node.v_class === 'V2' || node.v_class === 'V3' || touchesZone) return 'R2'
   if (!selfClosed) return 'R2'      // V0/V1 with no closure record downgrades to V2 (§2.1)
   return 'R0'                       // the recorded check is the gate; R0 is hygiene on top
@@ -171,6 +184,7 @@ const ACTOR_SCHEMA = {
       type: ['object', 'null'],
       properties: {
         check_command: { type: 'string' },
+        check_source: { enum: ['registry', 'ad-hoc'], description: 'registry = named in the repo contract verifier registry; ad-hoc = composed for this node. Ad-hoc closures are force-included in the AUDIT sample (§2.1).' },
         exit_status: { type: 'integer' },
         output_digest: { type: 'string' },
         timestamp: { type: 'string' },
@@ -256,7 +270,10 @@ Do the work on the agent branch. Then:
 - If this node is V0/V1: SELECT and RUN a concrete check (prefer a name from the repo
   contract's verifier registry; "${node.check || 'TBD'}" is a suggestion only). You may
   only report outcome="done" if the check actually passed — return its closure_record
-  {check_command, exit_status, output_digest, timestamp}. The timestamp MUST be the real
+  {check_command, check_source, exit_status, output_digest, timestamp}. check_source is
+  "registry" ONLY if the command is one named in the repo contract's verifier registry;
+  anything you composed yourself is "ad-hoc" (ad-hoc closures are force-audited — mislabeling
+  is itself an audit finding). The timestamp MUST be the real
   wall-clock time from your environment, never a placeholder like 00:00:00Z. No passing recorded check ⇒ do
   NOT claim done; report outcome="failed" with notes, OR if the task is genuinely
   judgment-bound, say so in notes (it will be downgraded to V2).${r0Phase}
@@ -378,12 +395,26 @@ ${JSON.stringify(findings, null, 2)}`
 }
 
 // ── Adjudication (orchestrator rules; §3.3) ──────────────────────────────────
+// A blocker's citation must RESOLVE, not merely exist: a constitution clause (§N.N) or one of
+// the node's named acceptance criteria. Presence-only checking let a confabulated citation
+// through (ex-audit 2026-06-12); resolution is deterministic, so it is checked here, not asked.
+function _citationResolves(cited, node) {
+  if (!cited) return false
+  if (/§\s*\d/.test(cited)) return true
+  const c = String(cited).toLowerCase()
+  return ((node && node.acceptance_criteria) || []).some(ac => {
+    const a = String(ac).toLowerCase()
+    const name = a.split(':')[0].trim()
+    return a.includes(c) || c.includes(a) || (name.length >= 4 && c.includes(name))
+  })
+}
 // Returns { blockers, majors, minors } after discarding invalid findings.
-function adjudicate(findingSets) {
+function adjudicate(findingSets, node) {
   const all = findingSets.filter(Boolean).flatMap(f => f.findings || [])
-  const blockers = all.filter(f => f.severity === 'blocker' && f.cited_criterion) // uncited blocker = invalid
+  const cites = f => _citationResolves(f.cited_criterion, node)
+  const blockers = all.filter(f => f.severity === 'blocker' && cites(f))  // unresolved citation = invalid
   const majors = all.filter(f => f.severity === 'major' ||
-    (f.severity === 'blocker' && !f.cited_criterion))                              // demote uncited blockers
+    (f.severity === 'blocker' && !cites(f)))                              // demote: uncited OR non-resolving
   const minors = all.filter(f => f.severity === 'minor')
   return { blockers, majors, minors }
 }
@@ -509,7 +540,8 @@ async function runNode(node) {
                critic: { blockers: [breach], majors: [], minors: [] }, blocked: true }
     }
     return { node: node.id, status: actor.outcome, actor, review_tier: tier,
-             closed_by: selfClosed ? 'check' : 'executor' }
+             closed_by: selfClosed ? 'check' : 'executor',
+             check_source: selfClosed ? ((actor.closure_record && actor.closure_record.check_source) || 'ad-hoc') : null }
   }
 
   // R1: one spec-blind diff critic. R2: one cold-eye critic with a ≤5-read spot-check budget.
@@ -521,7 +553,7 @@ async function runNode(node) {
       // Gating critic — the model IS the gate, always Opus (§3.6).
       { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
 
-  const verdict = adjudicate(findingSets)
+  const verdict = adjudicate(findingSets, node)
   if (breach) verdict.blockers.push(breach)   // machine evidence joins the gate verdict (§6.5)
 
   // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
@@ -536,7 +568,7 @@ async function runNode(node) {
       { label: `critic:${node.id}:cold`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })
     coldConfirmed = true
     if (cold) {
-      const c = adjudicate([cold])              // new findings ⇒ the green was stale
+      const c = adjudicate([cold], node)        // new findings ⇒ the green was stale
       verdict.blockers.push(...c.blockers)
       verdict.majors.push(...c.majors)
       verdict.minors.push(...c.minors)
@@ -596,7 +628,7 @@ while (doneSet.size < nodes.length) {
   // Surface the mutating nodes that ARE write-set-disjoint (would fan out once worktrees land).
   const disjoint = []
   for (const n of ready.filter(n => n.parallelizable && declaresMut(n)))
-    if (!disjoint.some(c => c.write_set.some(x => n.write_set.includes(x)))) disjoint.push(n)
+    if (!disjoint.some(c => c.write_set.some(x => n.write_set.some(y => _globOverlap(x, y))))) disjoint.push(n)
   if (disjoint.length > 1)
     log(`Write-set-disjoint, safe to fan out (worktree+merge wiring pending): ${disjoint.map(n => n.id).join(', ')}`)
 
@@ -665,10 +697,18 @@ if (MCLASS === 'M0') {
   }
 }
 
-// M1 samples the rechecks; M2 re-runs every recorded check (§2.4).
-const recheckInstruction = MCLASS === 'M2'
+// M1 samples the rechecks; M2 re-runs every recorded check (§2.4). Ad-hoc-check self-closures
+// (no verifier-registry backing) are never left to sampling luck — check-adequacy there is a
+// hidden judgment inside the V0/V1 tier, so the audit always judges it (ex-audit 2026-06-12).
+const _adHoc = Object.values(results)
+  .filter(r => r.closed_by === 'check' && (r.check_source || 'ad-hoc') !== 'registry')
+  .map(r => r.node)
+const _adHocClause = _adHoc.length
+  ? ` ALWAYS include these ad-hoc-check self-closures in the judge-sample (their check was composed by the actor, not named in the repo contract — judge the CHECK'S ADEQUACY, not just its exit status): ${JSON.stringify(_adHoc)}.`
+  : ''
+const recheckInstruction = (MCLASS === 'M2'
   ? 'Re-run ALL recorded closure checks and judge-sample 2-3 self-closures for sufficiency (§2.1).'
-  : 'SAMPLE the rechecks: re-run 2-3 recorded closure checks and judge-sample 2-3 self-closures for sufficiency (§2.1).'
+  : 'SAMPLE the rechecks: re-run 2-3 recorded closure checks and judge-sample 2-3 self-closures for sufficiency (§2.1).') + _adHocClause
 
 const auditSummary = Object.values(results).map(r =>
   `[${r.node}] status=${r.status} closed_by=${r.closed_by || '-'}` +

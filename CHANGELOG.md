@@ -9,6 +9,33 @@ Surface-contraction release, from the Human's first principle: **the feedback su
 exactly two channels** — one passive (the two-way §12 email loop), one active
 (`/mission-log-audit`). Everything else is internal machinery.
 
+### Hardened (same-day, from an external audit — constitution text unchanged)
+An independent reviewer cloned the repo and audited it; the points that survived verification
+(several were stale — fixed in 0.3.2 — or traced to outdated README claims) landed as:
+- **Email router allowlisted** — the verdict/proposal routers ran `claude -p` under
+  `bypassPermissions` + a deny-list; reply bodies are untrusted input, and blacklisting an
+  LLM's action space against injection is the wrong polarity. Now each router gets a per-kind
+  tool **allowlist** (telemetry-scoped edits, path-scoped git, validators); the §9 deny shapes
+  remain as backstop.
+- **Glob-aware overlap matching** — deliverable-zone checks (executor ×2, classifier) and the
+  parallel-disjointness check used substring/equality matching: write_set `src/**/*.cs` vs zone
+  `src/ui/` silently missed the V2 floor. All four sites now use a conservative glob-overlap
+  (`_globOverlap`) that errs toward raising ceremony.
+- **Blocker citations must resolve, not merely exist** — `adjudicate()` only checked that
+  `cited_criterion` was non-null; a confabulated citation passed. Now it must match a
+  constitution clause (`§N.N`) or one of the node's named acceptance criteria, deterministically,
+  or the blocker demotes to major.
+- **`check_source: registry | ad-hoc` at close-time binding** — which check closes a V0/V1 node
+  is itself a judgment hiding inside the mechanical tier. Actors must declare whether the bound
+  check came from the repo contract's verifier registry; **ad-hoc self-closures are
+  force-included in the AUDIT judge-sample** (adequacy judged, not sampled by luck). Recorded in
+  the run-record (`nodes_executed[].check_source`).
+- **README status section rewritten** — it still said "no mission has run under v0.2," which
+  misled the auditor into "zero empirical evidence" (8 validated run-records exist). Now states
+  the actual corpus and adopts the honest narrower pitch: a disciplined overnight draft
+  generator with an audit trail; V2 machinery is attention compression for the human's morning
+  review (which §2 already said).
+
 ### Added
 - **§12 two-channel principle** — codified as the opening of the Reporting section; a third
   human-facing feedback surface is a design defect, not a feature.
