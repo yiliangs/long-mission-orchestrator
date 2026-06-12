@@ -20,10 +20,13 @@ _S = {
     "body": "font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
             "font-size:14px;line-height:1.55;color:#24292f;max-width:780px",
     "h1": "font-size:20px;margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid #d8dee4",
-    "h2": "font-size:17px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid #eaeef2",
+    "h2": "font-size:17px;margin:16px 0 8px;padding:2px 0 2px 9px;border-left:4px solid #0a66c2",
     "h3": "font-size:15px;margin:14px 0 6px",
     "h4": "font-size:14px;margin:12px 0 6px",
-    "p": "margin:8px 0",
+    "p": "margin:6px 0",
+    "labelblock": "margin:6px 0 10px;padding:7px 11px;background:#f8f9fb;"
+                  "border-left:3px solid #d0d7de;border-radius:0 6px 6px 0",
+    "labelrow": "margin:3px 0",
     "code": "font-family:Consolas,'SFMono-Regular',Menlo,monospace;font-size:92%;"
             "background:#f0f2f5;padding:1px 5px;border-radius:4px",
     "pre": "font-family:Consolas,'SFMono-Regular',Menlo,monospace;font-size:13px;"
@@ -48,6 +51,19 @@ _OL_ITEM = re.compile(r"^(\s*)\d+[.)]\s+(.*)$")
 _UL_ITEM = re.compile(r"^(\s*)[-*+]\s+(.*)$")
 _TABLE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|[\s:|-]*$")
 
+# Inline bold labels (`**What:** ...`) — the walk-through / report idiom. Rendered as
+# separate color-coded rows instead of one run-on paragraph.
+_LABEL = re.compile(r"\*\*([^*\n]{1,28}?):\*\*\s*")
+_LABEL_COLORS = {
+    "what": "#0a66c2", "context": "#0a66c2",
+    "rec": "#1a7f37", "recommendation": "#1a7f37", "fix": "#1a7f37", "how to apply": "#1a7f37",
+    "options": "#9a6700",
+    "evidence": "#57606a", "source": "#57606a", "ref": "#57606a",
+    "why": "#8250df",
+    "warning": "#cf222e", "risk": "#cf222e", "caveat": "#cf222e", "blocker": "#cf222e",
+}
+_LABEL_DEFAULT_COLOR = "#0a66c2"
+
 _CODESPAN = re.compile(r"`([^`]+)`")
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 _ITALIC = re.compile(r"(?<![\w*])\*([^*\n]+)\*(?![\w*])")
@@ -64,7 +80,7 @@ def render(text: str) -> str:
 
     def flush_para() -> None:
         if para:
-            out.append(f'<p style="{_S["p"]}">{_inline(" ".join(para))}</p>')
+            out.append(_para_html(" ".join(para)))
             para.clear()
 
     while i < n:
@@ -131,6 +147,26 @@ def render(text: str) -> str:
 
     flush_para()
     out.append("</div>")
+    return "\n".join(out)
+
+
+def _para_html(text: str) -> str:
+    """One paragraph. If it carries `**Label:**` segments, break it into a card of
+    color-coded label rows; otherwise an ordinary <p>."""
+    parts = _LABEL.split(text)
+    if len(parts) < 3:
+        return f'<p style="{_S["p"]}">{_inline(text)}</p>'
+    out: list[str] = []
+    pre = parts[0].strip()
+    if pre:
+        out.append(f'<p style="{_S["p"]}">{_inline(pre)}</p>')
+    rows: list[str] = []
+    for i in range(1, len(parts) - 1, 2):
+        label, body = parts[i].strip(), parts[i + 1].strip()
+        color = _LABEL_COLORS.get(label.lower(), _LABEL_DEFAULT_COLOR)
+        rows.append(f'<div style="{_S["labelrow"]}"><strong style="color:{color}">'
+                    f'{_inline(label)}:</strong> {_inline(body)}</div>')
+    out.append(f'<div style="{_S["labelblock"]}">{"".join(rows)}</div>')
     return "\n".join(out)
 
 
