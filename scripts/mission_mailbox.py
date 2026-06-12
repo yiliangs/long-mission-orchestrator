@@ -39,7 +39,7 @@ REPOS = Path.home() / "source" / "repos"
 
 def cmd_report(args) -> None:
     path = Path(args.file) if args.file else Path(".mission") / args.run_id / "REPORT.md"
-    body = _read(path)
+    body = _stamp(_read(path))
     subject = f"[LMO report {args.run_id}] {_verdict_line(body)}"
     recipient, mid = mailbridge.send(subject, body, _md_html(body), kind="report", ref=args.run_id)
     print(f"emailed report {args.run_id} to {recipient} ({mid})")
@@ -47,7 +47,7 @@ def cmd_report(args) -> None:
 
 def cmd_walkthrough(args) -> None:
     path = Path(args.file)
-    body = _read(path)
+    body = _stamp(_read(path))
     ref = args.ref or path.stem
     subject = f"[LMO walkthrough {ref}] decisions need you"
     recipient, mid = mailbridge.send(subject, body, _md_html(body), kind="walkthrough", ref=ref)
@@ -59,8 +59,9 @@ def cmd_proposal(args) -> None:
     body = _read(path)
     footer = ("\n\n---\nTo APPLY this amendment, reply:  GRANT <your grant-secret>\n"
               "To decline or comment, just reply with your reasoning.\n")
+    body = _stamp(body + footer)
     subject = f"[LMO proposal {args.id}] amendment - reply GRANT <secret> to apply"
-    recipient, mid = mailbridge.send(subject, body + footer, _md_html(body + footer),
+    recipient, mid = mailbridge.send(subject, body, _md_html(body),
                                      kind="proposal", ref=args.id)
     print(f"emailed proposal {args.id} to {recipient} ({mid})")
 
@@ -185,6 +186,14 @@ def _verdict_line(report: str) -> str:
         if stripped:
             return stripped[:80]
     return "mission report"
+
+
+def _stamp(body: str) -> str:
+    """Append a sent-timestamp footer so a re-send is never byte-identical to its
+    predecessor — Gmail trims duplicate bodies within a thread down to a '...' button,
+    which reads as an empty email."""
+    from datetime import datetime
+    return f"{body}\n\n---\nSent {datetime.now():%Y-%m-%d %H:%M} · LMO §12 channel\n"
 
 
 def _md_html(text: str) -> str:
