@@ -27,9 +27,17 @@ attention; a review that surfaces nothing is worse than none (mirrors §3.3 esca
 
 ## What it scans (the log)
 
-1. **Un-audited delivered missions** → the **human-diff** (the gold signal, §7): `git diff --stat
-   <delivered-ref>..HEAD`, attributed to nodes. A large edit on a node the framework **self-closed
-   (V0/V1)** is a verification gap — flag it loudly (§2.1 caught in the wild).
+1. **Un-audited delivered missions** → the **human-diff** (the gold signal, §7). First run the
+   deterministic classifier:
+   `python ~/.claude/scripts/diff_overlap.py <repo> <fork_point> <delivered-ref>` — it splits
+   post-delivery commits into **correction** (modifies/deletes mission-authored lines; blame
+   overlap > 0) vs **non-corrective** (continuation/housekeeping; overlap = 0). Only
+   correction-shaped commits are defect signal; a correction on a node the framework
+   **self-closed (V0/V1)** is a verification gap — flag it loudly (§2.1 caught in the wild).
+   Present the machine classification as a **pre-verdict to confirm or override** ("your 3
+   commits touch 0 mission-authored lines — classified non-corrective; confirm?"), never as an
+   open question. Record the outcome in `human_review.human_diff_classification` +
+   `human_diff_overlap` (record schema v0.3).
 2. **Escalated blockers without a legit/noise verdict** — escalation-precision telemetry (§3.3); a
    falling legit-rate is evidence to tighten critics.
 3. **Classification-calibration entries with `may_lower:false`** awaiting human evidence (§7) — the
@@ -42,9 +50,13 @@ Dedupe against already-decided items so nothing is surfaced twice.
 
 ## Output: the decision walk-through
 
-Ranked by **leverage × staleness**, phone-readable (inverted pyramid, §12). Each item:
+Ranked by **leverage × staleness**, phone-readable (inverted pyramid, §12). **Plain layer
+first (§12):** the walk-through opens with a jargon-free paragraph — what landed, what needs
+the Human — and every item's *What* line is written in plain sentences; V/R/M shorthand is
+translated in place ("V2" → "model-checked; no machine test exists"), never exported raw. The
+evidence refs stay precise below. Each item:
 
-- **What & why it needs you** — one line.
+- **What & why it needs you** — one line, plain language.
 - **Recommendation** — mine, reasoning compressed to a clause.
 - **One-tap options** — `(a) accept rec · (b) <alternative> · (c) defer`.
 - **Evidence** — a ref (run-id, file:line, ledger entry).
@@ -59,7 +71,9 @@ below routine ones.
 ## Capture (the Human's answers ARE the gold signal)
 
 Record each verdict where it belongs — actively, not awaited:
-- human-diff + blocker legit/noise → run-record `human_review`;
+- human-diff + blocker legit/noise → run-record `human_review`; the confirmed/overridden
+  overlap pre-verdict → `human_diff_classification` + `human_diff_overlap`
+  (`confirmed_by_human: true` once the Human rules);
 - classification verdicts → `classification_calibration` (`evidence_source:"human_diff"`, and
   `may_lower` exactly as the Human rules — a critic opinion never can);
 - accepted amendments → hand to `/evolve`;

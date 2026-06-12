@@ -3,6 +3,43 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.3] — 2026-06-12
+
+Reader-side protocol release, driven by the Human's review of the first live §12 email
+round-trip. The 0.3.2 theme was "a signal that exists only as prose does not exist for
+calibration"; this release is its mirror: **a signal the Human cannot read does not exist
+for calibration either.** Three changes, all from direct human feedback.
+
+### Added
+- **Plain layer first (§12)** — anything addressed to the Human leads with a jargon-free
+  layer (what happened, what needs you); the full evidence ledger follows below a divider.
+  Layered, never cut — readability is not bought with information loss. V/R/M shorthand is
+  translated in place when it must appear; exporting it raw to the Human is a defect, not
+  rigor.
+- **Decision ledger (§12, report schema)** — the mission-end report carries a filtered
+  ledger of contested/boundary role decisions (*role → decision → against what → because*,
+  rationale captured at decision time): boundary classifications, critic rejections +
+  accepted-majors, escapes, tier floor-ups, budget crossings. Routine decisions compress to
+  a visible suppressed-count line so omission is auditable; every 5th mission ships
+  unfiltered so the filter itself is audited. Plan schema gains `v_class_rationale`;
+  report schema gains `plain_summary` / `decision_ledger` / `decisions_suppressed`.
+- **`scripts/diff_overlap.py` (§7)** — deterministic corrective/non-corrective split of the
+  human-diff: a post-delivery commit is correction-shaped iff it modifies/deletes
+  mission-authored lines (git-blame overlap against the mission commit set). The audit
+  presents the machine stat as a pre-verdict to confirm or override — never an open "was
+  this a correction?" question (block-hygiene's branch-recovery commit cost an email
+  round-trip to disambiguate exactly this; the script reproduces that verdict in seconds:
+  13 post-delivery commits, 0 mission-authored lines touched).
+
+### Changed
+- **Record schema 0.2 → 0.3** — `human_review` gains `human_diff_classification`
+  (correction / continuation / housekeeping / mixed / none) + `human_diff_overlap`
+  (the machine stat, with `confirmed_by_human`). Only a correction-class diff licenses
+  reading the human-diff as a verification gap.
+- **`/mission` DELIVER, `/mission-log-audit`, mailbox verdict router** — updated to compose
+  the plain layer + decision ledger, run the overlap pre-classification, and route confirmed
+  classifications into the record.
+
 ## [0.3.2] — 2026-06-11
 
 Hardening driven by the first four v0.3.1 missions (web-ui-port, jobe-submit-audit, and the

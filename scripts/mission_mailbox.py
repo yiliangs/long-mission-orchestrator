@@ -125,10 +125,12 @@ The Human's reply (verbatim):
 
 Record the Human's verdict into `mission_records/{ref}.json` (§7 — the human-diff is the gold signal):
 1. `git pull --rebase` first (fieldnotes syncs across machines).
-2. Populate the `human_review` block per the v0.2 schema: `reviewed: true`; `human_diff_summary` \
+2. Populate the `human_review` block per the v0.3 schema: `reviewed: true`; `human_diff_summary` \
 (a short note of the Human's judgment / what changed); `blocker_verdicts` as \
 `[{{"node": ..., "verdict": "legit"|"noise"}}]` for any blocker they ruled on; `accepted` true/false \
-if they said whether they accept/merge. If they gave a classification verdict, also fill \
+if they said whether they accept/merge. If the reply confirms or overrides a diff_overlap \
+pre-verdict (correction vs non-corrective post-delivery diff), set `human_diff_classification` \
+and `human_diff_overlap.confirmed_by_human: true`. If they gave a classification verdict, also fill \
 `classification_calibration`, respecting the §2.2 truth-source asymmetry (a human verdict may lower \
 OR raise a class — set `may_lower` accordingly). Never invent a verdict the Human did not give.
 3. **Fan out**: if `{ref}` is a walk-through / audit thread (not a single run) or the reply rules on \

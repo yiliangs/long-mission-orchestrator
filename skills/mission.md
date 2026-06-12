@@ -73,7 +73,9 @@ PLAN — a vague grill is the cheapest place to fail and the most expensive plac
 Draft a DAG conforming to `~/.claude/docs/mission-plan.schema.json`. For each node assign:
 deps, `parallelizable` + `write_set` (the blast radius — globs/namespaces/section-ids it
 mutates; `[]` = read-only, fans out freely; §6.5), `v_class` (round up under uncertainty; honor categorical V2 floors
-§2.2), `ac_required` (true for all V2 / outward-facing / final-deliverable nodes — the
+§2.2) **+ `v_class_rationale` on every boundary call** (one line, captured now — it becomes the
+decision-ledger row the Human calibrates against at DELIVER; a §2.2 round-up or a near-V1 V2
+without a rationale is a ledger hole), `ac_required` (true for all V2 / outward-facing / final-deliverable nodes — the
 floors), `review_tier` + `review_rationale` (R0–R3 per §3.1 — the V→R floor table binds:
 V0/V1-closed nodes may take R0, V2 nodes take ≥R2, final deliverable R3; above the floor
 choose freely, one line of rationale each; an all-one-tier plan must justify the uniformity
@@ -220,7 +222,19 @@ Then **deliver**:
 - Write `REPORT.md` + `report.json` to `.mission/<run-id>/` (format: constitution §12 —
   inverted pyramid, one screen, Needs-you items phrased as one-tap verdicts; `report.json`
   per `~/.claude/docs/mission-report.schema.json` — `needs_you[].ask`, not `item`).
-- Write the **run-record** to fieldnotes (`mission_records/`), record schema **v0.2**, authored
+  **Compose for the reader (§12):**
+  - **Plain layer leads** — what happened and what needs the Human, in sentences with zero
+    V/R/M vocabulary (translate in place where shorthand must appear). The evidence ledger
+    follows below a `---` divider. Layered, never cut.
+  - **Decision ledger** — the contested/boundary role decisions only, one line each
+    (*role → decision → against what → because*, from `v_class_rationale` /
+    `review_rationale` / critic findings): boundary classifications, critic rejections +
+    accepted-majors, escapes, tier floor-ups, budget crossings. Compress the rest to a
+    visible suppressed-count line ("11 suppressed: 9 uncontested passes, …"). **Every 5th
+    mission** (count from fieldnotes `mission_records/`) ship the ledger unfiltered so the
+    filter itself gets audited. Mirror into `report.json` (`plain_summary`,
+    `decision_ledger`, `decisions_suppressed`).
+- Write the **run-record** to fieldnotes (`mission_records/`), record schema **v0.3**, authored
   by you — not synthesized. Include the human-diff slot (filled when the Human reviews).
   Populate `classification_calibration`: `mission_class` + per-node `features` and assigned
   classes. Leave the hindsight verdicts **null** — AUDIT fills any machine-check verdicts

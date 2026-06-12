@@ -30,6 +30,7 @@ Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\miss
 Copy-Item "$repo\scripts\classify-mission.js"   "$claude\scripts\classify-mission.js"   -Force
 Copy-Item "$repo\scripts\mission_heartbeat.ps1" "$claude\scripts\mission_heartbeat.ps1" -Force
 Copy-Item "$repo\scripts\validate_record.py"    "$claude\scripts\validate_record.py"    -Force
+Copy-Item "$repo\scripts\diff_overlap.py"       "$claude\scripts\diff_overlap.py"       -Force
 
 # Email channel (constitution §12) -> scripts/  (config lives at ~/.claude\mailbridge.env, not synced)
 Copy-Item "$repo\scripts\mailbridge.py"          "$claude\scripts\mailbridge.py"          -Force

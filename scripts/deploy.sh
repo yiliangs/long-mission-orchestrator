@@ -30,6 +30,7 @@ cp "$repo/executors/mission-executor.workflow.js" "$claude/workflows/mission-exe
 # Deterministic helpers -> scripts/
 cp "$repo/scripts/classify-mission.js" "$claude/scripts/classify-mission.js"
 cp "$repo/scripts/validate_record.py"  "$claude/scripts/validate_record.py"
+cp "$repo/scripts/diff_overlap.py"     "$claude/scripts/diff_overlap.py"
 
 # Email channel (constitution §12) -> scripts/  (config lives at ~/.claude/mailbridge.env, not synced)
 cp "$repo/scripts/mailbridge.py"          "$claude/scripts/mailbridge.py"

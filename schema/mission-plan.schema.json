@@ -95,6 +95,10 @@
           "enum": ["V0", "V1", "V2", "V3"],
           "description": "Verification class (§2). Planner may under-specify upward via rounding; close-time binding (§2.1) downgrades V0/V1 to V2 if no closure record is produced."
         },
+        "v_class_rationale": {
+          "type": "string",
+          "description": "One line: why this V-class for this node, captured at assignment time (§12 decision ledger). Boundary calls (a §2.2 round-up, a near-V1 V2) MUST carry it; obvious ones may omit."
+        },
         "check": {
           "type": ["string", "null"],
           "default": null,

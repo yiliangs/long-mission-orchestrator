@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.2
+**Version:** 0.3.3
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -541,9 +541,16 @@ merge authority at every tier above the first.
   constitution **version**). Records are **written by the
   orchestrator, schema-validated — never synthesized by a second model.** Telemetry the
   framework keeps about itself must not pass through a paraphrase.
-- **The human-diff is the gold signal.** What the Human changes or rejects the next morning
-  is ground truth about where the framework misjudged. (Same epistemology as the
-  ml-literacy consolidation protocol: the diff is the evidence.)
+- **The human-diff is the gold signal — but only its *corrective* part.** What the Human
+  changes or rejects the next morning is ground truth about where the framework misjudged.
+  (Same epistemology as the ml-literacy consolidation protocol: the diff is the evidence.)
+  Post-delivery commits split deterministically into **correction** (the commit modifies or
+  deletes mission-authored lines — `scripts/diff_overlap.py` computes the blame overlap) vs
+  **non-corrective** (continuation / housekeeping — zero overlap; no signal against the
+  mission). The audit presents the machine classification for the Human to **confirm or
+  override** — never an open "was this a correction?" question, and never a default
+  assumption that a post-delivery diff is corrective (block-hygiene's branch-recovery commit
+  cost an email round-trip to disambiguate exactly this).
 - **Classification calibration (V-class and M-class).** The framework's two depth dials are
   set by a *naive* orchestrator on the first run and sharpen with experience. Every
   classification decision is recorded with its post-hoc correctness — generalizing the cap-hit
@@ -698,9 +705,27 @@ Four unambiguous morning signals, so silence is never confused with progress:
   visible. This is the report's primary job — it carries the V0–V3 distinction (§2, §2.3) all
   the way to the tired human at 7am, so trust calibrates to the actual evidence, not to the
   uniform look of a checkmark.
+- **Plain layer first (write for the reader, not the protocol).** Anything addressed to the
+  Human — report email, walk-through, ack — **leads** with a plain-language layer: what
+  happened and what needs them, in complete sentences free of V/R/M vocabulary; where internal
+  shorthand must appear it is translated in place ("V2" → "model-checked; no machine test
+  exists"). The full evidence ledger follows below a divider or as an attachment — **layered,
+  never cut**: readability is not bought with information loss, and completeness is not an
+  excuse for an unreadable lead. The vocabulary compresses agent-to-agent traffic; exporting
+  it untranslated to the Human is a defect, not rigor.
+- **The decision ledger (calibration legibility).** The mission-end report carries a
+  **filtered** ledger of the run's role decisions — one line each, *role → decision → against
+  what → because*, the rationale captured at decision time. The filter surfaces only
+  **contested or boundary** calls: classifications near a boundary or later contradicted,
+  critic rejections and accepted-majors, escapes used, tier floor-ups, budget crossings,
+  anything a human verdict later touched. Routine decisions compress to **visible counts**
+  ("11 suppressed: 9 uncontested passes, 2 minor accepts") so the omission itself is
+  auditable, and **every 5th mission ships the unfiltered ledger** so the filter — the one
+  place the framework chooses what the Human sees of its own judgment — is itself audited.
+  This is how the Human calibrates each role's behavior without reading a transcript.
 - **The run-record is a DELIVER step, not a courtesy.** Every mission — including re-scoped,
   lean-pivoted, or human-interrupted ones — writes `mission_records/<run-id>.json` (record
-  schema v0.2) and validates it deterministically (`scripts/validate_record.py`) before the
+  schema v0.3) and validates it deterministically (`scripts/validate_record.py`) before the
   report goes out; `report.json` validates against `mission-report.schema.json` the same way.
   A mission that skips its record starves the §7 gold signal — two of the first four v0.3.1
   runs did exactly this, and the human verdicts had nowhere to land.

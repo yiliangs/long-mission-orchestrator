@@ -13,6 +13,39 @@
     "branch": { "type": "string" },
     "commits": { "type": "integer" },
 
+    "plain_summary": {
+      "type": "string",
+      "description": "§12 plain layer: what happened and what needs the Human, in sentences free of V/R/M vocabulary. This (rendered from REPORT.md's lead) is what the email opens with; the evidence ledger follows below."
+    },
+
+    "decision_ledger": {
+      "type": "array",
+      "description": "§12 calibration legibility: the contested/boundary role decisions, one line each — role, what was decided, against what, because. Routine decisions are NOT listed here; they compress into decisions_suppressed so omission stays auditable. Every 5th mission ships unfiltered (filtered:false on every entry is fine then).",
+      "items": {
+        "type": "object",
+        "required": ["role", "decision", "because"],
+        "additionalProperties": false,
+        "properties": {
+          "role": { "enum": ["orchestrator", "planner", "critic", "auditor", "executor", "harness", "human"] },
+          "decision": { "type": "string", "description": "What was decided (e.g. 'assigned V2', 'rejected revision 1', 'accepted major with reason', 'floored tier up to Sonnet')." },
+          "against": { "type": "string", "description": "The object of the decision — node id, criterion, artifact." },
+          "because": { "type": "string", "description": "One line of rationale, captured at decision time — the thing the Human calibrates against." },
+          "contested": { "type": "boolean", "description": "True when another choice was live (boundary classification, override, escape)." }
+        }
+      }
+    },
+
+    "decisions_suppressed": {
+      "type": "object",
+      "description": "Counts for decisions the ledger filter dropped — visible so the filter itself is auditable.",
+      "required": ["count"],
+      "additionalProperties": false,
+      "properties": {
+        "count": { "type": "integer" },
+        "breakdown": { "type": "string", "description": "e.g. '9 uncontested critic passes, 2 routine V1 classifications'." }
+      }
+    },
+
     "needs_you": {
       "type": "array",
       "description": "The one-tap verdicts. Field name is `ask` (not `item`); ids are short stable strings so email replies can cite them.",
