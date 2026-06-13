@@ -72,7 +72,7 @@
     {
       "id": "n3-constitution",
       "title": "Constitution: blocker policy (1c) + name 3 verification scopes (2c) + bump 0.3.6",
-      "instruction": "Edit docs/agent-constitution.md (and CHANGELOG.md). (1c) Make §3.3's 'a blocker must be fixed or replanned otherwise' a BUILT mechanism: state that a gate blocker triggers a capped fix/replan ATTEMPT before filing, consistent with N1's loop. (2c) Add a short clause naming the three non-collapsible verification scopes — verify (per-item), judge (cross-item adjudication), audit (whole-mission) — and state they must never be merged, because merging recreates the correlated-checker failure. (version) Bump the **Version:** header to 0.3.6 and update any in-doc version references; add a CHANGELOG.md entry for 0.3.6 summarizing this mission's Tier 0/1/2 changes. Keep every addition surgical — do not rewrite unrelated sections. Read N1's result so the text matches the implemented loop.",
+      "instruction": "Edit docs/agent-constitution.md (and CHANGELOG.md). (1c) Make §3.3's 'a blocker must be fixed or replanned otherwise' a BUILT mechanism: state that a gate blocker triggers a capped fix/replan ATTEMPT before filing, consistent with N1's loop. (2c) Add a short clause naming the three non-collapsible verification scopes — verify (per-item), judge (cross-item adjudication), audit (whole-mission) — and state they must never be merged, because merging recreates the correlated-checker failure. (additive-clarity) At §1 principle #5 (or adjacent), add one line distinguishing GIT-additive (the perimeter: agent never merges/force-pushes/deletes-branches/tags — load-bearing safety) from CONTENT-level editing (modify-in-place, consolidate, and delete-and-replace are PREFERRED over accretion; the codebase is not append-only — cross-ref the Tier-3 deletion pattern). (version) Bump the **Version:** header to 0.3.6 and update any in-doc version references; add a CHANGELOG.md entry for 0.3.6 summarizing this mission's Tier 0/1/2 changes. Keep every addition surgical — do not rewrite unrelated sections. Read N1's result so the text matches the implemented loop.",
       "deps": ["n1-executor-gatefix"],
       "parallelizable": true,
       "write_set": ["docs/agent-constitution.md", "CHANGELOG.md"],
@@ -84,24 +84,25 @@
       "acceptance_criteria": [
         "blocker-policy-built: §3.3 (or adjacent) states the capped fix/replan-before-file mechanism, consistent with N1",
         "three-scopes-named: constitution names verify/judge/audit as three non-collapsible scopes with the no-merge rationale",
+        "additive-distinction-stated: constitution distinguishes git-additive (perimeter safety) from content-level editing (adjustment/consolidation preferred, not append-only)",
         "version-bumped: **Version:** header reads 0.3.6 and CHANGELOG.md carries a matching 0.3.6 entry",
         "surgical: no unrelated section rewritten (verified by diff)"
       ]
     },
     {
       "id": "n4-leak-audit",
-      "title": "2a: audit every 'executor does X' claim — JS or prose?",
-      "instruction": "Create docs/deterministic-shell-audit.md: a checklist table walking every place the framework claims 'the executor does X' across README + docs/agent-constitution.md + skills/mission.md, marking each claim either ENFORCED-IN-JS (cite executor file:line) or PROSE-ONLY (cite the markdown file:line). Seed with the three known leaks: punchlist re-enter loop (prose, mission.md:245), major-fix path (now JS after N1 — cite the new code), critic read-only sandbox (prose). Deliver the table plus a one-line verdict per claim. This names the systematic weakness as a reusable checklist.",
+      "title": "2a: audit every 'executor does X' claim — JS or prose? (folded into evolution.md)",
+      "instruction": "Add a new section to docs/evolution.md — do NOT create a standalone file, fold it in to avoid doc accretion (content-additive discipline). The section is a checklist table walking every place the framework claims 'the executor does X' across README + docs/agent-constitution.md + skills/mission.md, marking each claim either ENFORCED-IN-JS (cite executor file:line) or PROSE-ONLY (cite the markdown file:line). Seed with the three known leaks: punchlist re-enter loop (prose, mission.md:245), major-fix path (now JS after N1 — cite the new code), critic read-only sandbox (prose). Deliver the table plus a one-line verdict per claim. Frame it as a recurring diagnostic the evolution loop can re-run.",
       "deps": ["n1-executor-gatefix"],
       "parallelizable": true,
-      "write_set": ["docs/deterministic-shell-audit.md"],
+      "write_set": ["docs/evolution.md"],
       "v_class": "V2",
-      "v_class_rationale": "Analysis deliverable — completeness of the enumeration is a judgment.",
+      "v_class_rationale": "Analysis deliverable — completeness of the enumeration is a judgment. Folded into evolution.md rather than a new file to resist doc accretion.",
       "ac_required": true,
       "review_tier": "R2",
       "model_tier": "opus",
       "acceptance_criteria": [
-        "leaks-enumerated: table covers the load-bearing 'executor does X' claims across README + constitution + mission.md",
+        "leaks-enumerated: a new section in docs/evolution.md covers the load-bearing 'executor does X' claims across README + constitution + mission.md",
         "js-vs-prose-marked: each claim marked ENFORCED-IN-JS or PROSE-ONLY with file:line evidence",
         "known-three-present: punchlist re-enter, major-fix, and critic-sandbox rows present and correctly classified post-N1"
       ]
