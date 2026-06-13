@@ -1,0 +1,132 @@
+{
+  "schema_version": "0.2",
+  "run_id": "tier012-20260612",
+  "goal": "Implement Tier 0 (honesty/disclosure), Tier 1 (close the gate-fix loop), and Tier 2 (name the systematic weakness) from the audit follow-up backlog.",
+  "repo": "C:/Users/yilia/source/repos/long-mission-orchestrator",
+  "mode": "attended",
+  "constitution_version": "0.3.5",
+  "mission_class": "M1",
+  "classifier_inputs": { "n": 6, "v_max": "V2", "zone": true, "outward": false },
+  "compute_role_required": "light",
+  "token_budget": 280000,
+  "agent_budget": 18,
+  "deliverable_zones": ["docs/agent-constitution.md", "docs/operating-card.md", "executors/**"],
+  "nodes": [
+    {
+      "id": "n0-contract",
+      "title": "Auto-draft minimal Agent contract",
+      "instruction": "Create a `## Agent contract` section in a new CLAUDE.md at the repo root. Define: (1) a verifier registry naming concrete checks that ACTUALLY exist — `node --check <file>` for executor JS, `python scripts/validate_record.py <schema> <record>` for run-records, JSON-schema validation for schema/*.json; (2) deliverable zones — docs/agent-constitution.md and docs/operating-card.md (policy core) and executors/** (mechanism core), all carrying the V2 floor; (3) a precedence note: user instruction > repo contract > constitution, and the contract may only TIGHTEN the constitution. Keep it minimal and accurate to what exists in the repo today — do not invent checks.",
+      "deps": [],
+      "parallelizable": true,
+      "write_set": ["CLAUDE.md"],
+      "v_class": "V2",
+      "v_class_rationale": "Governance artifact defining how future missions verify here — judgment, no deterministic check of its own.",
+      "ac_required": true,
+      "review_tier": "R2",
+      "model_tier": "opus",
+      "acceptance_criteria": [
+        "verifier-registry-real: every named check maps to a tool/script that exists in the repo or standard toolchain",
+        "deliverable-zones-listed: constitution + operating-card + executors named as V2-floor zones",
+        "precedence-stated: records user>contract>constitution and tighten-only"
+      ]
+    },
+    {
+      "id": "n1-executor-gatefix",
+      "title": "Strip null byte + wire gate-fix loop (blockers+majors) + per-major reason",
+      "instruction": "Edit executors/mission-executor.workflow.js. (0b) Remove the stray null byte (`node --check` must pass and no \\u0000 remains). (1a) AFTER the existing adjudicate() call in runNode, ADD a capped fix-loop (do NOT modify existing adjudicate/gate lines — additive insertion only, to keep the regression surface minimal): while verdict has blockers OR majors and cycles < 2, re-dispatch the actor via the existing reviseActorPrompt machinery with the current findings, re-run the node's effective-tier critic, and re-adjudicate. A failed/empty revision must NOT regress the node (keep prior state). After the cap: surviving blockers still file to the human (current behavior preserved); surviving majors are accepted-with-reason. (1b) Each accepted major carries a written `reason` at close (extend the result shape, not the gate). Preserve micro-loop, improver, R-tier gate, write_set-breach, cold-reviewer, and budget logic unchanged. The loop is additive: it can only improve or no-op.",
+      "deps": [],
+      "parallelizable": true,
+      "write_set": ["executors/mission-executor.workflow.js"],
+      "v_class": "V2",
+      "v_class_rationale": "Modifies the verification gate itself; a bug could mask findings, so correctness exceeds any single check (§2.3). Mechanism-core zone (executors/**) → categorical V2 floor.",
+      "check": "node --check executors/mission-executor.workflow.js",
+      "ac_required": true,
+      "review_tier": "R2",
+      "improve_pass": true,
+      "model_tier": "opus",
+      "acceptance_criteria": [
+        "parses-clean: `node --check` exits 0 and no null byte remains in the file",
+        "gatefix-loop-wired: blockers OR majors trigger a capped (<=2) revise->re-review->re-adjudicate cycle inserted AFTER adjudicate()",
+        "gatefix-additive: a failed/empty revision never regresses the node; surviving blockers still file to human, surviving majors carry a written reason",
+        "no-regression: micro-loop, improver, R-tier gate, write_set-breach, cold-reviewer, and budget logic are all preserved (verified by diff — existing lines unmodified)"
+      ]
+    },
+    {
+      "id": "n2-readme",
+      "title": "README: correct gate-fix disclosure (0a,0c) + promote 'scales absence' identity (2b)",
+      "instruction": "Edit README.md. (0a) Move the gate-fix/remediation loop OUT of any 'redo loop works' framing; once N1 lands, state it as 'wired in 0.3.6' accurately (not as an unbuilt aspiration and not overpromised). (0c) Add the subtree-replan stub — currently disclosed only in code comments — to the 'Specified but not yet wired' list. (2b) Promote the 'scales absence, not compute / attention compression' framing from the closing caveat to a front-page identity statement near the top. All disclosure MUST match the actual post-N1 code state; read N1's result before writing.",
+      "deps": ["n1-executor-gatefix"],
+      "parallelizable": true,
+      "write_set": ["README.md"],
+      "v_class": "V2",
+      "v_class_rationale": "Prose accuracy + identity framing is judgment; the disclosure must match implemented reality (anti-overpromise is the whole point of Tier 0).",
+      "ac_required": true,
+      "review_tier": "R2",
+      "model_tier": "opus",
+      "acceptance_criteria": [
+        "disclosure-accurate: README's gate-fix description matches N1's actual code state (wired in 0.3.6); subtree-replan stub is listed as not-yet-wired",
+        "identity-promoted: 'scales absence / attention compression' appears as a front-page identity statement, not only a closing caveat",
+        "no-overpromise: no README claim describes a loop the executor does not implement"
+      ]
+    },
+    {
+      "id": "n3-constitution",
+      "title": "Constitution: blocker policy (1c) + name 3 verification scopes (2c) + bump 0.3.6",
+      "instruction": "Edit docs/agent-constitution.md (and CHANGELOG.md). (1c) Make §3.3's 'a blocker must be fixed or replanned otherwise' a BUILT mechanism: state that a gate blocker triggers a capped fix/replan ATTEMPT before filing, consistent with N1's loop. (2c) Add a short clause naming the three non-collapsible verification scopes — verify (per-item), judge (cross-item adjudication), audit (whole-mission) — and state they must never be merged, because merging recreates the correlated-checker failure. (version) Bump the **Version:** header to 0.3.6 and update any in-doc version references; add a CHANGELOG.md entry for 0.3.6 summarizing this mission's Tier 0/1/2 changes. Keep every addition surgical — do not rewrite unrelated sections. Read N1's result so the text matches the implemented loop.",
+      "deps": ["n1-executor-gatefix"],
+      "parallelizable": true,
+      "write_set": ["docs/agent-constitution.md", "CHANGELOG.md"],
+      "v_class": "V2",
+      "v_class_rationale": "Policy-core deliverable zone (§8) → categorical V2 floor (§2.2). Text must match implemented behavior or it becomes a fresh prose-leak.",
+      "ac_required": true,
+      "review_tier": "R2",
+      "model_tier": "opus",
+      "acceptance_criteria": [
+        "blocker-policy-built: §3.3 (or adjacent) states the capped fix/replan-before-file mechanism, consistent with N1",
+        "three-scopes-named: constitution names verify/judge/audit as three non-collapsible scopes with the no-merge rationale",
+        "version-bumped: **Version:** header reads 0.3.6 and CHANGELOG.md carries a matching 0.3.6 entry",
+        "surgical: no unrelated section rewritten (verified by diff)"
+      ]
+    },
+    {
+      "id": "n4-leak-audit",
+      "title": "2a: audit every 'executor does X' claim — JS or prose?",
+      "instruction": "Create docs/deterministic-shell-audit.md: a checklist table walking every place the framework claims 'the executor does X' across README + docs/agent-constitution.md + skills/mission.md, marking each claim either ENFORCED-IN-JS (cite executor file:line) or PROSE-ONLY (cite the markdown file:line). Seed with the three known leaks: punchlist re-enter loop (prose, mission.md:245), major-fix path (now JS after N1 — cite the new code), critic read-only sandbox (prose). Deliver the table plus a one-line verdict per claim. This names the systematic weakness as a reusable checklist.",
+      "deps": ["n1-executor-gatefix"],
+      "parallelizable": true,
+      "write_set": ["docs/deterministic-shell-audit.md"],
+      "v_class": "V2",
+      "v_class_rationale": "Analysis deliverable — completeness of the enumeration is a judgment.",
+      "ac_required": true,
+      "review_tier": "R2",
+      "model_tier": "opus",
+      "acceptance_criteria": [
+        "leaks-enumerated: table covers the load-bearing 'executor does X' claims across README + constitution + mission.md",
+        "js-vs-prose-marked: each claim marked ENFORCED-IN-JS or PROSE-ONLY with file:line evidence",
+        "known-three-present: punchlist re-enter, major-fix, and critic-sandbox rows present and correctly classified post-N1"
+      ]
+    },
+    {
+      "id": "n5-final",
+      "title": "Cross-file consistency + verifier-registry pass",
+      "instruction": "Final assembly gate (read-only verification, no mutation). Confirm: (1) `node --check executors/mission-executor.workflow.js` exits 0 and no null byte. (2) constitution **Version:** line reads 0.3.6, consistent across the constitution header, CHANGELOG, and any README reference. (3) README's gate-fix disclosure matches the executor's actual implemented behavior — no overpromise, no under-claim. (4) every named check in the new Agent contract actually runs. (5) constitution text (1c/2c) is consistent with the executor behavior N1 built. Produce a short consistency report. Any mismatch is a blocker citing the specific node's named criterion.",
+      "deps": ["n0-contract", "n1-executor-gatefix", "n2-readme", "n3-constitution", "n4-leak-audit"],
+      "parallelizable": false,
+      "write_set": [],
+      "v_class": "V2",
+      "v_class_rationale": "Whole-deliverable consistency is judgment, backed by V1 checks (node --check, version grep) but the doc<->code match is not machine-decidable.",
+      "check": "node --check executors/mission-executor.workflow.js && grep -n '^\\*\\*Version:\\*\\* 0.3.6' docs/agent-constitution.md",
+      "ac_required": true,
+      "is_final_deliverable": true,
+      "review_tier": "R3",
+      "model_tier": "opus",
+      "acceptance_criteria": [
+        "executor-parses: node --check exits 0, no null byte",
+        "version-consistent: 0.3.6 across constitution header + CHANGELOG + any README reference",
+        "disclosure-matches-code: README gate-fix claims equal executor reality",
+        "registry-green: every named check in the Agent contract runs and passes",
+        "doc-code-consistent: constitution 1c/2c text matches N1 behavior"
+      ]
+    }
+  ]
+}
