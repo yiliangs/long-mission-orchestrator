@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.5
+**Version:** 0.3.6
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -60,6 +60,14 @@ These are the load-bearing beliefs. Everything below is mechanism serving them.
 5. **Additive is free; destructive is forbidden.** Autonomous runs may only add (commits
    on agent branches, draft PRs, reports). Anything irreversible or outward-facing is a
    human decision (§4, §9).
+   *"Additive" is the git perimeter, not a content style.* The load-bearing rule is
+   **git-additive**: the agent never merges, force-pushes, deletes branches, or tags
+   (§9.1) — the irreversible, outward-facing perimeter. It is **not** "the codebase is
+   append-only." At the **content level**, modify-in-place, consolidation, and
+   delete-and-replace are *preferred* over accretion; a clean edit that removes stale text
+   is better than a note bolted beside it. The deletion pattern (§0.2, docs/evolve.md) is
+   the sanctioned content-level removal path. Conflating the two — refusing to delete prose
+   because "additive only" — is a misreading: it grows cruft and is itself a defect.
 6. **The system evolves on evidence, never on vibes.** Caps, rules, and the constitution
    itself change only through run-records that justify the change, batched and approved
    (§7). The human is always the merge authority for the system's evolution.
@@ -120,6 +128,26 @@ highest-judgment work is V3; and the report must **label evidence class** so a h
 mistakes model-judged for machine-proven (§12). **V2 is judgment made legible, not
 verification.** Treat its green checks accordingly — strongest where work is mechanical
 (V0/V1), weakest exactly where the value of research lives.
+
+### 2.3a Three verification scopes (never collapsible)
+
+Verification happens at three distinct **scopes**, and they must **never be merged into one
+pass**:
+
+| Scope | Granularity | Who | When |
+|---|---|---|---|
+| **verify** | per-item | the check / critic on a single node | at node close (§2.1, §3) |
+| **judge** | cross-item adjudication | the orchestrator weighing one node's findings against another's | during EXECUTE / FIGHT (§3.3) |
+| **audit** | whole-mission | the AUDIT pass over the assembled deliverable | after EXECUTE (§6) |
+
+The separation is **load-bearing, not bureaucratic.** Merging any two recreates the
+**correlated-checker failure** (§2.3): a single actor that verifies its own item, adjudicates
+its own dispute, and audits its own whole is one correlated viewpoint wearing three hats — a
+shared blind spot passes all three gates looking green. Independence is the entire value of a
+gate; collapsing scopes destroys it. So a node's own verify never doubles as the mission audit;
+the AUDIT pass re-runs checks **fresh** rather than trusting the per-node close (§2.1); and
+adjudication is the orchestrator's, never the actor's (§3.3). Different scope, different
+viewpoint, by construction.
 
 ### 2.4 Mission classes (orchestration depth)
 
@@ -231,7 +259,7 @@ floor; never below it.**
 
 | Severity | Definition | Routing |
 |---|---|---|
-| **Blocker** | Violates a *named* acceptance criterion or a *named* constitution clause. | **Human-only** to accept/waive. Must be fixed or replanned otherwise. |
+| **Blocker** | Violates a *named* acceptance criterion or a *named* constitution clause. | **Human-only** to accept/waive — but only *after* the capped fix/replan attempt below. |
 | **Major** | Material correctness/quality risk; criteria technically met. | Orchestrator fixes it **or** accepts-with-written-reason (logged to ledger + run-record). |
 | **Minor** | Real but small. | Straight to defect ledger; spend no cycle. |
 
@@ -240,6 +268,18 @@ floor; never below it.**
   invalid finding, not waiving a real blocker, so it does not breach human-only
   adjudication). This keeps "blocker" a narrow, checkable claim rather than the critic's
   strongest adjective, and counters manufactured severity.
+- **A blocker triggers a capped fix/replan *attempt* before it files.** "Must be fixed or
+  replanned otherwise" is a **built mechanism**, not an aspiration: a valid blocker (and,
+  in the reference executor, any surviving *major*) at the gate re-dispatches the actor
+  with the findings to revise, re-runs the effective-tier critic, and re-adjudicates —
+  **capped** (`gate_fix_cycles`, default 2, §6.2) and **strictly non-regressing** (a
+  revision is adopted only on lexicographic progress — fewer blockers, then fewer majors;
+  a failed, empty, or non-improving revision is discarded so the node never regresses).
+  If the cap exhausts and a blocker still stands, *then* it files to the Human — who is
+  still the **sole** waiver authority (§9.3); the loop fixes what a retry can fix, it never
+  waives. A blocker rooted in wrong *acceptance criteria* (not a fixable defect) takes the
+  subtree-replan rung instead (§6.1) — `plan_assumption_false`, not a fix cycle. This is
+  the gate-side wiring of the §6.1 problem-solving ladder.
 - **Severity does *not* round up.** Uncertain severity defaults to **major** (still
   handled, without spending human attention). Contrast §2.2: V-class protects correctness,
   severity protects the human's attention — different resources, opposite defaults.
@@ -459,6 +499,7 @@ plan.json with a reason string.
 | Subtree replans | 2 per subtree, 3 per mission |
 | Plan-fight rounds | 3 |
 | Audit → punchlist → fix cycles | 2, then defect ledger |
+| Gate-fix cycles (§3.3) | 2 per node, then surviving blockers file to the Human + majors accept-with-reason |
 | Review per a-c task | R-tier per node (§3.1): R2 default for V2 nodes; R3 panel for final deliverable + plan-fight; R2 spot-check budget ≤5 reads |
 | Cold-reviewer swaps (§3.4) | 1, fired only at a candidate-clean terminal on high-stakes nodes |
 
