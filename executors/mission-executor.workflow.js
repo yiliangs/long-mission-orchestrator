@@ -434,7 +434,13 @@ function capFor(node, key) {
 // blocker — only the Human may waive it (truth-source asymmetry, §2.2). Enforced only when the
 // planner declared a write_set; undeclared nodes already run conservative-serial.
 function _writeSetMatch(file, entry) {
-  const f = file.replace(/\\/g, '/').replace(/^\.\//, '')
+  let f = file.replace(/\\/g, '/').replace(/^\.\//, '')
+  // Relativize an absolute touched path to repo-root so it can match a repo-relative write_set
+  // entry. Actors report absolute paths on Windows; comparing those against a relative
+  // declaration produced two false breaches in mission tier012-20260612 (path-normalization gap).
+  const _root = String(REPO || '').replace(/\\/g, '/').replace(/\/$/, '')
+  if (_root) { const lf = f.toLowerCase(), lr = _root.toLowerCase()
+    if (lf === lr || lf.startsWith(lr + '/')) f = f.slice(_root.length).replace(/^\//, '') }
   const e = entry.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '')
   if (f === e || f.startsWith(e + '/')) return true                 // exact file or directory prefix
   if (e.includes('*')) {                                            // glob: ** crosses /, * does not
