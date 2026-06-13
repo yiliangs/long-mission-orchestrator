@@ -180,3 +180,64 @@ gated by you.
 
 **Activation is deferred until run-records exist** (post Phase 1). an evolution pass over an empty
 corpus has nothing to propose.
+
+## The JS-vs-prose leak audit (a recurring diagnostic)
+
+A standing failure mode of a self-documenting framework: the prose claims "the executor does X"
+while the runtime does not enforce X — X lives only in a spawned agent's *prompt* (advisory, an
+honor request) or in a doc paragraph (aspirational), not in the deterministic shell. Each such gap
+is a place where "designed protocol" silently overstates "reference runtime." The README §"honest
+pitch" makes this distinction in prose; this section makes it *checkable*, claim by claim.
+
+**How to re-run this diagnostic** (the evolution loop folds it into a Tier-3 pass): walk every
+load-bearing "the executor / the framework does X" claim across `README.md`,
+`docs/agent-constitution.md`, and `skills/mission.md`. Mark each:
+
+- **ENFORCED-IN-JS** — a deterministic code path in `executors/mission-executor.workflow.js`
+  makes X true regardless of any agent's cooperation. Cite `file:line`.
+- **PROSE-ONLY** — X is asserted in markdown and/or *requested* in a spawn prompt, but no JS path
+  guarantees it. A cooperating agent satisfies it; a non-cooperating or confused one is not caught.
+  Cite the markdown `file:line` (and the prompt line if the request lives in the executor).
+
+The distinction is not "prose is bad." Much of the protocol is *correctly* prose — judgment work
+the gate is meant to catch downstream. The point is to keep the inventory honest about *which*
+claims are mechanically guaranteed, so no reader (or future amendment) mistakes a prompt-level
+request for an enforced invariant. PROSE-ONLY is a finding only when the surrounding text *reads*
+as if it were enforced.
+
+Seed inventory (re-derive `:line` cites when files move — they drift across versions):
+
+| # | Claim ("the executor/framework does X") | Asserted at | Classification | Evidence |
+|---|---|---|---|---|
+| 1 | **Punchlist items re-enter EXECUTE** (capped 2 cycles, then ledger) | `skills/mission.md:245` | **PROSE-ONLY** | No re-entry path exists. AUDIT emits `punchlist` (`mission-executor.workflow.js:790`); a `plan_assumption_false` node is only marked done-with-defect and the runtime *continues* — `// a fuller adapter would re-plan the subtree here … marks the node done-with-defect and continues` (`mission-executor.workflow.js:689-694`). The punchlist→new-node→re-enter loop is not wired. |
+| 2 | **A blocker (and any surviving major) triggers a capped fix→re-review→re-adjudicate loop at the gate** | `docs/agent-constitution.md:271-282`, `README.md:170-173` | **ENFORCED-IN-JS** | The gate-fix `while` loop re-dispatches the actor on `[...blockers, ...majors, ...minors]`, re-runs the effective-tier critic, re-adjudicates, and adopts only on lexicographic progress — `mission-executor.workflow.js:575-596`. Cap `gate_fix_cycles` default 2 at `:84`. *(Was PROSE-ONLY pre-N1; the major-fix path is now code.)* |
+| 3 | **Each surviving major closes with a written accept-with-reason** | `docs/agent-constitution.md:273`, `README.md:173` | **ENFORCED-IN-JS** | Deterministic per-major reason stamped on every uncovered major after the loop — `mission-executor.workflow.js:601-605`. |
+| 4 | **The gating critic reviews in a read-only / bounded-read sandbox** (R1 no repo access; R2 ≤5 reads of the critic's own choosing; "do not explore the repo") | `docs/agent-constitution.md:223-224,546-547`; requested in-prompt at `mission-executor.workflow.js:306,326-329` | **PROSE-ONLY** | No tool restriction is passed to `spawn` for any critic — the `spawn` opts carry only `label/phase/schema/model` (`:558`, `:585`, `:616`); there is no `tools`/`allowedTools`/permission field anywhere (grep: zero hits). "≤5 reads," "no repo access," and "do not explore" are *instructions in the prompt string*, honored by a cooperating agent, not enforced by the shell. |
+| 5 | **A blocker is invalid unless its citation RESOLVES to a clause or named criterion** | `docs/agent-constitution.md:269`, `README.md:94` | **ENFORCED-IN-JS** | `_citationResolves` deterministically checks `§N` or fuzzy-matches a named acceptance criterion; `adjudicate` demotes uncited/non-resolving blockers to major — `mission-executor.workflow.js:405-423`. |
+| 6 | **An actor writing outside its declared write_set raises a machine-evidence blocker (human-only to waive)** | `docs/agent-constitution.md` §6.5 region; `README.md:174` | **ENFORCED-IN-JS** | `writeSetBreach` diffs touched files vs declaration and emits a blocker; injected into the verdict and gated at every tier incl. R0 — `mission-executor.workflow.js:447-462,533-534,561,582,587`. |
+| 7 | **V0/V1 nodes with no valid passing closure record downgrade to V2 (a critic spawns)** | `docs/agent-constitution.md:100`, `:223` | **ENFORCED-IN-JS** | `selfClosed` requires `closure_record.exit_status === 0`; `reviewFloor` raises non-self-closed V0/V1 to R2 (a fresh critic) — `mission-executor.workflow.js:115-122,526-528`. |
+| 8 | **The mission class floors deterministically — a hand-edited/under-classified plan cannot run below its facts** | `docs/agent-constitution.md` §2.4; `README.md:176` ("deterministic class guard") | **ENFORCED-IN-JS** | `_classFloor` re-derives the floor from node V-classes + zone overlap; `MCLASS` is `max(claimed, floor)` — `mission-executor.workflow.js:63-76`, discrepancy logged at `:638-639`. |
+| 9 | **A budget ceiling crossing is recorded as a machine-readable cap_hit, never prose-only** | `docs/agent-constitution.md` §6.4; `README.md` budget telemetry | **ENFORCED-IN-JS** | `budgetReport` pushes `cap_hits` entries for token/agent overrun into the run-record — `mission-executor.workflow.js:706-722`. |
+| 10 | **Disjoint mutating nodes fan out in parallel under worktree isolation** | `README.md:187-188` (explicitly listed as *not yet wired*); §6.5 | **PROSE-ONLY** | Correctly disclosed as unwired: the disjoint set is *computed and logged* but run serially — `mission-executor.workflow.js:676-685` (`worktree+merge wiring pending`). Listed here so the audit stays exhaustive; this row is *consistent* (prose already says "specified but not wired"), not a leak. |
+| 11 | **A `plan_assumption_false` outcome re-plans the affected subtree** | `docs/agent-constitution.md` §6.1 tier 3; `README.md:188-191` (disclosed as not-wired) | **PROSE-ONLY** | Same site as #1: surfaced, budget-counted, logged to AUDIT, node marked done-with-defect — but the subtree is *not* re-derived (`mission-executor.workflow.js:687-697`). Consistent with the README's "specified but not yet wired" list; not a leak. |
+
+**One-line verdict per claim:**
+1. Leak — prose reads as a wired loop; it is not. Either wire punchlist re-entry or soften mission.md to "candidate nodes for a follow-up mission."
+2. Clean — enforced post-N1 (the major path was the known leak; now code).
+3. Clean — deterministic per-major reason.
+4. Leak — the critic "sandbox" is a prompt request, not a shell constraint; the prose should say "instructed to" not imply enforcement, or the spawn should pass an actual tool restriction.
+5. Clean — citation resolution is deterministic.
+6. Clean — write_set breach is machine-enforced.
+7. Clean — close-time downgrade is mechanical.
+8. Clean — class floor is re-derived in code.
+9. Clean — cap_hits are machine-recorded.
+10. Clean (consistent) — already disclosed as unwired; no overstatement.
+11. Clean (consistent) — already disclosed as unwired; no overstatement.
+
+**Composite read:** of the load-bearing claims, two are genuine leaks (#1 punchlist re-entry, #4
+critic sandbox) — both PROSE-ONLY presented as if enforced. The major-fix path (#2), historically
+the third known leak, is closed as of N1. The two remaining PROSE-ONLY rows (#10, #11) are *not*
+leaks because the README already labels them unwired; they are included so a future re-run inherits
+the full inventory rather than re-discovering them. The recurring discipline: when a new "the
+executor does X" sentence is added to any doc, this table gets a row, and the row's classification
+must be defensible against the actual `spawn`/control-flow code — not against the sentence next to it.
