@@ -1,4 +1,7 @@
-export const meta = {
+// `meta` is read from this script's scope by the Workflow harness (which wraps the body in a
+// function — see the top-level `return`s below — so a bare ESM `export` is unnecessary and would
+// also break the repo contract's `node --check` parse gate). Kept as a plain top-level const.
+const meta = {
   name: 'mission-executor',
   description: 'Claude Code executor adapter: walks a frozen plan.json DAG — fan-out, R-tier review gating, mission budget, problem-solving ladder, subtree replan — per the agent constitution.',
   phases: [
@@ -78,6 +81,7 @@ const DEFAULT_CAPS = {
   sub_loop_iterations: 5,
   subtree_replans: 2,
   cold_swaps: 1,            // §3.4 cold-reviewer rotation; evolution-tuned
+  gate_fix_cycles: 2,       // §6.1 tier 2: capped revise→re-review→re-adjudicate at the gate (≤2)
 }
 
 // ── Mission budget (§6.4): dual ceiling frozen at PLAN ───────────────────────
@@ -435,7 +439,7 @@ function _writeSetMatch(file, entry) {
   if (f === e || f.startsWith(e + '/')) return true                 // exact file or directory prefix
   if (e.includes('*')) {                                            // glob: ** crosses /, * does not
     const rx = new RegExp('^' + e.replace(/[.+^${}()|[\]]/g, '\\$&')
-      .replace(/\*\*/g, ' ').replace(/\*/g, '[^/]*').replace(/ /g, '.*') + '$')
+      .replace(/\*\*/g, ' ').replace(/\*/g, '[^/]*').replace(/ /g, '.*') + '$')
     return rx.test(f)
   }
   return false
@@ -553,8 +557,52 @@ async function runNode(node) {
       // Gating critic — the model IS the gate, always Opus (§3.6).
       { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
 
-  const verdict = adjudicate(findingSets, node)
+  let verdict = adjudicate(findingSets, node)
   if (breach) verdict.blockers.push(breach)   // machine evidence joins the gate verdict (§6.5)
+
+  // ── Gate-fix loop (§6.1 tier 2): close the review→revise→re-review loop at the GATE ──────
+  // Additive, capped, and strictly non-regressing. While the gate verdict carries blockers OR
+  // majors, re-dispatch the actor with the current findings (reviseActorPrompt — the same
+  // machinery the improver loop uses), re-run THIS node's effective-tier critic, and
+  // re-adjudicate. The loop can only IMPROVE or NO-OP: a revision is adopted only when it is a
+  // clean `done` AND its fresh verdict is no worse (fewer-or-equal blockers, then majors); a
+  // failed / plan-assumption-false / empty / worse revision is DISCARDED and the prior actor +
+  // verdict stand. The write_set breach is a machine fact about whatever the actor last wrote,
+  // so it is recomputed per cycle on the adopted artifact. After the cap, surviving blockers
+  // still file to the human (unchanged), and surviving majors are accepted-with-reason below.
+  const _gateFixCap = capFor(node, 'gate_fix_cycles')
+  let _fixCycles = 0
+  while ((verdict.blockers.length > 0 || verdict.majors.length > 0) &&
+         _fixCycles < _gateFixCap && !budgetExhausted()) {
+    _fixCycles++
+    const _priorFindings = [...verdict.blockers, ...verdict.majors, ...verdict.minors]
+    const revised = await spawn(reviseActorPrompt(node, _priorFindings),
+      { label: `actor:${node.id}:gatefix${_fixCycles}@${aModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: aModel })
+    if (!revised || revised.outcome !== 'done') break   // failed/empty/plan-false revision ⇒ never regress
+    const _rBreach = writeSetBreach(node, revised)
+    const _rFindingSets = await parallel(lenses.map(lens => () =>
+      spawn(tier === 'R1' ? r1CriticPrompt(node, revised) : r2CriticPrompt(node, revised, lens),
+        { label: `critic:${node.id}:${tier}:gatefix${_fixCycles}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
+    const _rVerdict = adjudicate(_rFindingSets, node)
+    if (_rBreach) _rVerdict.blockers.push(_rBreach)
+    // Adopt only on STRICT progress (lexicographic: fewer blockers, or same blockers + fewer
+    // majors). Equal or worse ⇒ keep the prior artifact and stop — the loop improves or no-ops,
+    // it never churns the artifact for a lateral trade.
+    const _better = _rVerdict.blockers.length < verdict.blockers.length ||
+      (_rVerdict.blockers.length === verdict.blockers.length && _rVerdict.majors.length < verdict.majors.length)
+    if (!_better) break                                 // no strict progress ⇒ keep prior, stop
+    actor = revised; verdict = _rVerdict   // adopt the improved artifact + verdict (breach is carried inside _rVerdict)
+    if (verdict.blockers.length === 0 && verdict.majors.length === 0) break  // fully clean ⇒ done
+  }
+  // (1b) Each surviving major is accepted-with-reason — extend the RESULT shape, not the gate.
+  // The reason is a written record of WHY the major stands at close: the gate-fix loop ran to its
+  // cap (or to budget exhaustion) and the finding persisted; the actor's own suggested_fix, if
+  // any, is carried so the human/AUDIT sees the unapplied remedy. The gate itself is unchanged.
+  const _majorAcceptReason = (f) =>
+    `accepted-with-reason: gate-fix loop ran ${_fixCycles}/${_gateFixCap} cycle(s)` +
+    `${budgetExhausted() ? ' (budget exhausted)' : ''} and this major survived; ` +
+    `${f.suggested_fix ? `unapplied suggested_fix: ${f.suggested_fix}` : 'no actor-suggested fix on record'}.`
+  for (const _m of verdict.majors) if (_m.reason == null) _m.reason = _majorAcceptReason(_m)
 
   // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
   // model call). Fire ONE cold reviewer only to double-check a *clean* verdict on the final
