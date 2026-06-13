@@ -3,6 +3,65 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.3.6] — 2026-06-12
+
+Audit-follow-up release, closing three gaps a post-mission audit surfaced: a disclosure gap
+(Tier 0), an un-built mechanism the prose already claimed (Tier 1), and an unnamed systematic
+weakness (Tier 2). Theme: **the document must match the runtime, and the runtime must match
+the document** — a "must be fixed otherwise" with no fix loop, and an "additive only" read as
+"append-only," were both prose writing checks the machinery did not cash.
+
+### Added
+- **Gate-fix loop wired into the executor (Tier 1, §3.3 / §6.1).** §3.3's "a blocker must be
+  fixed or replanned otherwise" is now a **built mechanism**: a valid blocker (or surviving
+  major) at the gate re-dispatches the actor with the findings, re-runs the effective-tier
+  critic, and re-adjudicates — capped (`gate_fix_cycles`, default 2) and strictly
+  non-regressing (adopt only on lexicographic progress; discard a failed/empty/non-improving
+  revision so the node never regresses). Surviving blockers still file to the Human as the
+  sole waiver authority (§9.3); surviving majors close accepted-with-reason, each carrying a
+  written reason. Implemented in `executors/mission-executor.workflow.js` (gate-fix loop after
+  `adjudicate()`; per-major reason at close).
+- **Three verification scopes named (Tier 2, §2.3a).** The constitution now names **verify**
+  (per-item), **judge** (cross-item adjudication), and **audit** (whole-mission) as three
+  non-collapsible scopes, with the rationale stated: merging any two recreates the
+  correlated-checker failure (§2.3) — one viewpoint wearing three hats, one shared blind spot
+  passing all three gates green. This is the systematic weakness the audit named.
+- **Git-additive vs content-level distinction (§1 principle #5).** One line distinguishing
+  **git-additive** (the §9.1 perimeter — never merge/force-push/delete-branches/tag, the
+  load-bearing safety rule) from **content-level editing** (modify-in-place, consolidation,
+  and delete-and-replace are *preferred* over accretion; the codebase is **not** append-only).
+  Cross-refs the Tier-3 deletion pattern (§0.2, docs/evolve.md). Conflating the two grows cruft
+  and is itself a defect.
+
+### Changed
+- **README gate-fix disclosure corrected + 'scales absence' identity promoted** — the README
+  no longer overclaims a loop that did not exist; the gate-fix mechanism is described as built,
+  and the "the framework scales the *absence* of ceremony as deliberately as its presence"
+  identity is promoted to a first-class framing.
+- **Constitution 0.3.5 → 0.3.6** — the three additions above (§1 #5, §2.3a, §3.3) plus this
+  version bump. Strictly surgical; no unrelated section rewritten.
+
+### Fixed
+- **Executor parse-gate regression (integration follow-up).** The Tier-1 node had changed
+  `export const meta` → `const meta` in `mission-executor.workflow.js`, reasoning that the
+  `export` broke `node --check`. The opposite is true: `export` is the marker that makes Node
+  (>=22.7) parse the file as a module so its top-level `await` is legal — and it is also the
+  form the Workflow harness requires to read `meta`. Without it the file is CommonJS, where the
+  top-level `await` is a `SyntaxError`, so the parse gate the node closes on actually FAILED
+  while the node self-certified it green (a §2.1 false close — the §2.3a correlated-self-verify
+  trap, ironically the weakness this release names). `export` restored; `node --check` exits 0.
+  The Agent-contract note (CLAUDE.md) and the top-of-file comment that asserted the wrong
+  reasoning are corrected.
+
+### Added (telemetry)
+- **Gate-fix yield telemetry (§3.3 / §7).** So the new loop can pay rent in evidence (§0.2),
+  `nodes_executed[].gate_fix` now records `{cycles, adopted, blockers_resolved, majors_resolved,
+  terminal}` per node (emitted only when the gate carried findings); `cycles - adopted` is the
+  waste signal. `cap_hits.cap` admits `gate_fix_cycles`. The executor surfaces this in each node
+  result, snapshotting before the cold-reviewer so cold-caught findings don't pollute the counts.
+  Without it, Tier-2 calibration could not measure whether the cap pays rent or should be
+  down-ratcheted.
+
 ## [0.3.5] — 2026-06-12
 
 Self-knowledge release, from a second external audit ("does this deserve to live now that
