@@ -27,10 +27,11 @@ are force-audited.
 Notes on accuracy (do not invent checks):
 - `node --check` is the only JS-parse gate that exists; there is no `package.json`,
   no test runner, no linter in this repo. `executors/mission-executor.workflow.js`
-  is an ES module without a `.mjs` extension or `"type":"module"`, so a bare
-  `node --check` on it currently surfaces an `export`-token syntax error — closing
-  that gate (and stripping the file's stray null byte) is the executor node's job,
-  not a defect in the check itself.
+  begins with `export const meta` — both the Workflow harness's required entry
+  declaration and the marker that lets `node --check` (Node >=22.7) parse the file as
+  a module so its top-level `await` is legal. With that line intact `node --check`
+  exits 0; removing the `export` flips the file to CommonJS and the top-level `await`
+  becomes a syntax error, so the gate fails. Do not "simplify" the `export` away.
 - `scripts/validate_record.py` is both the run-record validator and the JSON-Schema
   validator; they are one tool with different inputs, not two tools. It implements
   the JSON-Schema subset the LMO schemas use (type/enum/const/required/properties/

@@ -41,6 +41,27 @@ the document** — a "must be fixed otherwise" with no fix loop, and an "additiv
 - **Constitution 0.3.5 → 0.3.6** — the three additions above (§1 #5, §2.3a, §3.3) plus this
   version bump. Strictly surgical; no unrelated section rewritten.
 
+### Fixed
+- **Executor parse-gate regression (integration follow-up).** The Tier-1 node had changed
+  `export const meta` → `const meta` in `mission-executor.workflow.js`, reasoning that the
+  `export` broke `node --check`. The opposite is true: `export` is the marker that makes Node
+  (>=22.7) parse the file as a module so its top-level `await` is legal — and it is also the
+  form the Workflow harness requires to read `meta`. Without it the file is CommonJS, where the
+  top-level `await` is a `SyntaxError`, so the parse gate the node closes on actually FAILED
+  while the node self-certified it green (a §2.1 false close — the §2.3a correlated-self-verify
+  trap, ironically the weakness this release names). `export` restored; `node --check` exits 0.
+  The Agent-contract note (CLAUDE.md) and the top-of-file comment that asserted the wrong
+  reasoning are corrected.
+
+### Added (telemetry)
+- **Gate-fix yield telemetry (§3.3 / §7).** So the new loop can pay rent in evidence (§0.2),
+  `nodes_executed[].gate_fix` now records `{cycles, adopted, blockers_resolved, majors_resolved,
+  terminal}` per node (emitted only when the gate carried findings); `cycles - adopted` is the
+  waste signal. `cap_hits.cap` admits `gate_fix_cycles`. The executor surfaces this in each node
+  result, snapshotting before the cold-reviewer so cold-caught findings don't pollute the counts.
+  Without it, Tier-2 calibration could not measure whether the cap pays rent or should be
+  down-ratcheted.
+
 ## [0.3.5] — 2026-06-12
 
 Self-knowledge release, from a second external audit ("does this deserve to live now that

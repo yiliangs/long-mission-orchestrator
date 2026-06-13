@@ -1,7 +1,14 @@
-// `meta` is read from this script's scope by the Workflow harness (which wraps the body in a
-// function — see the top-level `return`s below — so a bare ESM `export` is unnecessary and would
-// also break the repo contract's `node --check` parse gate). Kept as a plain top-level const.
-const meta = {
+// `export const meta` is REQUIRED — do NOT reduce it to `const meta`:
+//  (1) the Workflow harness reads the exported `meta` to label/configure the run;
+//  (2) it is also what makes `node --check` (the repo contract's only JS parse gate, §8) accept
+//      this file. With the `export` present, `node --check` exits 0; remove it and the file is
+//      treated as CommonJS, where the pervasive top-level `await` below becomes a SyntaxError
+//      ("missing ) after argument list"), so the gate the executor node closes on FAILS.
+// The v0.3.6 tier012 mission stripped this `export` and self-certified the parse gate green — a
+// false close (§2.1, the §2.3a correlated-self-verify trap). Restored here. The harness wraps the
+// body in an async function at runtime, which is why the top-level `await`/`return` are legal
+// there; both are load-bearing — do not "simplify" them away.
+export const meta = {
   name: 'mission-executor',
   description: 'Claude Code executor adapter: walks a frozen plan.json DAG — fan-out, R-tier review gating, mission budget, problem-solving ladder, subtree replan — per the agent constitution.',
   phases: [
@@ -577,7 +584,8 @@ async function runNode(node) {
   // so it is recomputed per cycle on the adopted artifact. After the cap, surviving blockers
   // still file to the human (unchanged), and surviving majors are accepted-with-reason below.
   const _gateFixCap = capFor(node, 'gate_fix_cycles')
-  let _fixCycles = 0
+  const _gfEntryBlockers = verdict.blockers.length, _gfEntryMajors = verdict.majors.length
+  let _fixCycles = 0, _gfAdopted = 0
   while ((verdict.blockers.length > 0 || verdict.majors.length > 0) &&
          _fixCycles < _gateFixCap && !budgetExhausted()) {
     _fixCycles++
@@ -597,7 +605,7 @@ async function runNode(node) {
     const _better = _rVerdict.blockers.length < verdict.blockers.length ||
       (_rVerdict.blockers.length === verdict.blockers.length && _rVerdict.majors.length < verdict.majors.length)
     if (!_better) break                                 // no strict progress ⇒ keep prior, stop
-    actor = revised; verdict = _rVerdict   // adopt the improved artifact + verdict (breach is carried inside _rVerdict)
+    actor = revised; verdict = _rVerdict; _gfAdopted++   // adopt the improved artifact + verdict (breach carried inside _rVerdict)
     if (verdict.blockers.length === 0 && verdict.majors.length === 0) break  // fully clean ⇒ done
   }
   // (1b) Each surviving major is accepted-with-reason — extend the RESULT shape, not the gate.
@@ -609,6 +617,23 @@ async function runNode(node) {
     `${budgetExhausted() ? ' (budget exhausted)' : ''} and this major survived; ` +
     `${f.suggested_fix ? `unapplied suggested_fix: ${f.suggested_fix}` : 'no actor-suggested fix on record'}.`
   for (const _m of verdict.majors) if (_m.reason == null) _m.reason = _majorAcceptReason(_m)
+
+  // Gate-fix yield telemetry (§3.3 / §7). Snapshot HERE — before the cold reviewer below — so
+  // cold-caught findings never pollute the resolved counts. Emitted only when the loop was
+  // eligible (the gate carried findings at entry). `cycles - adopted` is the WASTE signal (cycles
+  // that paid full actor+critic cost then discarded on no strict progress); `terminal` says why it
+  // stopped. This is the record the deletion pattern (§0.2, evolve.md) reads to decide whether
+  // gate_fix_cycles pays rent or should be down-ratcheted.
+  const _gateFixTel = (_gfEntryBlockers + _gfEntryMajors > 0) ? {
+    cycles: _fixCycles,
+    adopted: _gfAdopted,
+    blockers_resolved: Math.max(0, _gfEntryBlockers - verdict.blockers.length),
+    majors_resolved: Math.max(0, _gfEntryMajors - verdict.majors.length),
+    terminal: (verdict.blockers.length === 0 && verdict.majors.length === 0) ? 'clean'
+      : budgetExhausted() ? 'budget_exhausted'
+      : _fixCycles >= _gateFixCap ? 'cap_exhausted'
+      : 'no_progress',
+  } : null
 
   // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
   // model call). Fire ONE cold reviewer only to double-check a *clean* verdict on the final
@@ -634,6 +659,7 @@ async function runNode(node) {
     closed_by: 'critic', critic: verdict, review_tier: tier,
     cold_confirmed: coldConfirmed,
     blocked: verdict.blockers.length > 0,
+    gate_fix: _gateFixTel,
   }
 }
 
