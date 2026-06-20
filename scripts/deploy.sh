@@ -24,6 +24,7 @@ cp "$repo/docs/evolve.md"              "$claude/docs/evolve.md"
 # Skills -> commands/  (the Human's surface is two channels: email + /mission-log-audit;
 # /mission runs the work. evolve.md is an internal procedure in docs/, NOT a command.)
 cp "$repo/skills/mission.md"        "$claude/commands/mission.md"
+cp "$repo/skills/mission-loop.md"   "$claude/commands/mission-loop.md"
 cp "$repo/skills/mission-log-audit.md" "$claude/commands/mission-log-audit.md"
 rm -f "$claude/commands/evolve.md"   # demoted 0.3.4
 
@@ -35,12 +36,14 @@ cp "$repo/scripts/classify-mission.js" "$claude/scripts/classify-mission.js"
 cp "$repo/scripts/validate_record.py"  "$claude/scripts/validate_record.py"
 cp "$repo/scripts/diff_overlap.py"     "$claude/scripts/diff_overlap.py"
 
-# Email channel (constitution §12) -> scripts/  (config lives at ~/.claude/mailbridge.env, not synced)
-cp "$repo/scripts/mailbridge.py"          "$claude/scripts/mailbridge.py"
+# Channel (§12): the shared claude-channel dispatcher owns the inbox now. LMO ships only its
+# router (invoked by the dispatcher's `route`) + its OWN app manifest (deployed here, per the
+# router-and-manifest-version-together rule). The transport (channelbridge.py) is owned + deployed
+# by the claude-channel repo; deploy that first.
+mkdir -p "$claude/channel/apps.d"
 cp "$repo/scripts/mission_mailbox.py"     "$claude/scripts/mission_mailbox.py"
 cp "$repo/scripts/md2html.py"             "$claude/scripts/md2html.py"
-cp "$repo/scripts/run_mailbox_poll.cmd"   "$claude/scripts/run_mailbox_poll.cmd"
 cp "$repo/scripts/run_hidden.vbs"         "$claude/scripts/run_hidden.vbs"
-cp "$repo/scripts/mailbridge.env.example" "$claude/scripts/mailbridge.env.example"
+cp "$repo/channel/lmo.json"               "$claude/channel/apps.d/lmo.json"
 
 echo "Deployed long-mission-orchestrator -> $claude"

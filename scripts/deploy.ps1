@@ -22,6 +22,7 @@ Copy-Item "$repo\docs\evolve.md"                        "$claude\docs\evolve.md"
 # Skills -> commands/  (the Human's surface is two channels: email + /mission-log-audit;
 # /mission runs the work. evolve.md is an internal procedure in docs/, NOT a command.)
 Copy-Item "$repo\skills\mission.md"          "$claude\commands\mission.md"         -Force
+Copy-Item "$repo\skills\mission-loop.md"     "$claude\commands\mission-loop.md"    -Force
 Copy-Item "$repo\skills\mission-log-audit.md"   "$claude\commands\mission-log-audit.md"  -Force
 Remove-Item "$claude\commands\evolve.md" -ErrorAction SilentlyContinue   # demoted 0.3.4
 
@@ -34,13 +35,14 @@ Copy-Item "$repo\scripts\mission_heartbeat.ps1" "$claude\scripts\mission_heartbe
 Copy-Item "$repo\scripts\validate_record.py"    "$claude\scripts\validate_record.py"    -Force
 Copy-Item "$repo\scripts\diff_overlap.py"       "$claude\scripts\diff_overlap.py"       -Force
 
-# Email channel (constitution §12) -> scripts/  (config lives at ~/.claude\mailbridge.env, not synced)
-Copy-Item "$repo\scripts\mailbridge.py"          "$claude\scripts\mailbridge.py"          -Force
+# Channel (§12): the shared claude-channel dispatcher owns the inbox now. LMO ships only its
+# router (invoked by the dispatcher's `route`) + its OWN app manifest. The transport
+# (channelbridge.py) is owned + deployed by the claude-channel repo; deploy that first.
+New-Item -ItemType Directory -Force -Path "$claude\channel\apps.d" | Out-Null
 Copy-Item "$repo\scripts\mission_mailbox.py"     "$claude\scripts\mission_mailbox.py"     -Force
 Copy-Item "$repo\scripts\md2html.py"             "$claude\scripts\md2html.py"             -Force
-Copy-Item "$repo\scripts\run_mailbox_poll.cmd"   "$claude\scripts\run_mailbox_poll.cmd"   -Force
 Copy-Item "$repo\scripts\run_hidden.vbs"         "$claude\scripts\run_hidden.vbs"         -Force
-Copy-Item "$repo\scripts\mailbridge.env.example" "$claude\scripts\mailbridge.env.example" -Force
+Copy-Item "$repo\channel\lmo.json"               "$claude\channel\apps.d\lmo.json"        -Force
 
 Write-Host "Deployed long-mission-orchestrator -> $claude"
 Write-Host "  docs/      agent-constitution, schemas, codex adapter"

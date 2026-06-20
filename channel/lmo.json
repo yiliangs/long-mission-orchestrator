@@ -1,0 +1,10 @@
+{
+  "app": "lmo",
+  "_comment": "long-mission-orchestrator. Router = mission_mailbox.py 'route' (reads the reply as JSON on stdin, does GRANT/verdict routing into fieldnotes, prints the ack). Deployed by LMO's own deploy.{ps1,sh}.",
+  "label": "LMO",
+  "display_name": "LMO Orchestrator",
+  "signature": "Sent by LMO Orchestrator (long-mission-orchestrator) - autonomous mission channel.",
+  "router_cmd": ["python", "~/.claude/scripts/mission_mailbox.py", "route"],
+  "timeout": 600,
+  "ack": true
+}
