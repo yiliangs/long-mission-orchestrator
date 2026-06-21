@@ -435,11 +435,14 @@ function capFor(node, key) {
 }
 
 // ── write_set conformance (§6.5, deterministic — no model call) ──────────────
-// The executor DERIVES parallel-safety from declared write_sets; an actor that writes outside
-// its declaration silently invalidates that derivation (and is scope creep). At node close,
-// diff the touched files against the declaration: any out-of-set file raises a MACHINE-evidence
-// blocker — only the Human may waive it (truth-source asymmetry, §2.2). Enforced only when the
-// planner declared a write_set; undeclared nodes already run conservative-serial.
+// The executor RECORDS write_set breaches to the defect ledger as a MINOR finding (advisory in
+// the serial-only era, constitution v0.3.7). Rationale: until worktree fan-out for mutating
+// nodes is wired (§6.5 above), the parallel-safety derivation the write_set protected is not
+// yet load-bearing, and 9/14 corpus missions produced rubber-stamped benign-bleed waivers — a
+// gate guarding nothing. The check still runs and the breach is recorded (silent-accept ban
+// preserved), but it does NOT escalate to the Human. When worktree-isolated fan-out for mutating
+// nodes lands, change the returned severity back to 'blocker' — parallelism is what makes a
+// breach a real safety hazard, and the gate returns with the safety it protects.
 function _writeSetMatch(file, entry) {
   let f = file.replace(/\\/g, '/').replace(/^\.\//, '')
   // Relativize an absolute touched path to repo-root so it can match a repo-relative write_set
@@ -466,11 +469,11 @@ function writeSetBreach(node, actor) {
   const outside = touched.filter(f => !node.write_set.some(e => _writeSetMatch(f, e)))
   if (!outside.length) return null
   return {
-    severity: 'blocker',
+    severity: 'minor',
     claim: `write_set breach: node declared ${JSON.stringify(node.write_set)} but touched ${JSON.stringify(outside)}`,
-    evidence: 'deterministic diff-vs-declaration check (machine evidence — human-only to waive)',
-    cited_criterion: '§6.5 write_set declaration / §2.2 truth-source asymmetry',
-    suggested_fix: 'revert the out-of-set edits, or have the Human waive and widen the declaration in a replan',
+    evidence: 'deterministic diff-vs-declaration check (logged advisory, serial-only era)',
+    cited_criterion: '§6.5 write_set declaration (advisory pending worktree fan-out)',
+    suggested_fix: 'widen the declaration on the next replan if this pattern recurs; no gate action',
   }
 }
 
@@ -540,24 +543,21 @@ async function runNode(node) {
     actor.outcome === 'done' && actor.closure_record &&
     actor.closure_record.exit_status === 0
 
-  // write_set conformance (§6.5): deterministic diff-vs-declaration check at close. A breach
-  // is machine evidence — it gates EVERY tier, including R0 (the closure record proves the
-  // check passed, not that the actor stayed inside its blast radius).
+  // write_set conformance (§6.5): deterministic diff-vs-declaration check at close. In the
+  // serial-only era (constitution v0.3.7), a breach is logged to the defect ledger as a MINOR
+  // finding — advisory, not a gate. Until worktree fan-out for mutating nodes lands, the
+  // parallel-safety derivation the write_set protects is not load-bearing.
   const breach = actor.outcome === 'done' ? writeSetBreach(node, actor) : null
-  if (breach) log(`⚠ Node ${node.id}: ${breach.claim} — raised as machine-evidence blocker (§6.5).`)
+  if (breach) log(`· Node ${node.id}: ${breach.claim} — logged as minor (§6.5 advisory, serial-only era).`)
 
   // Review gate at the node's effective R-tier (§3.1): the V→R floor binds, the planner may
   // only raise. R0 already ran INSIDE the actor (two-phase prompt) and gates nothing — the
   // closure record is the gate.
   const tier = effectiveTier(node, selfClosed)
   if (tier === 'R0') {
-    if (breach) {
-      return { node: node.id, status: actor.outcome, actor, review_tier: tier,
-               closed_by: selfClosed ? 'check' : 'executor',
-               critic: { blockers: [breach], majors: [], minors: [] }, blocked: true }
-    }
     return { node: node.id, status: actor.outcome, actor, review_tier: tier,
              closed_by: selfClosed ? 'check' : 'executor',
+             critic: breach ? { blockers: [], majors: [], minors: [breach] } : undefined,
              check_source: selfClosed ? ((actor.closure_record && actor.closure_record.check_source) || 'ad-hoc') : null }
   }
 
@@ -571,7 +571,7 @@ async function runNode(node) {
       { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
 
   let verdict = adjudicate(findingSets, node)
-  if (breach) verdict.blockers.push(breach)   // machine evidence joins the gate verdict (§6.5)
+  if (breach) verdict.minors.push(breach)   // §6.5 advisory in serial-only era — logged, not gated
 
   // ── Gate-fix loop (§6.1 tier 2): close the review→revise→re-review loop at the GATE ──────
   // Additive, capped, and strictly non-regressing. While the gate verdict carries blockers OR
@@ -598,7 +598,7 @@ async function runNode(node) {
       spawn(tier === 'R1' ? r1CriticPrompt(node, revised) : r2CriticPrompt(node, revised, lens),
         { label: `critic:${node.id}:${tier}:gatefix${_fixCycles}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
     const _rVerdict = adjudicate(_rFindingSets, node)
-    if (_rBreach) _rVerdict.blockers.push(_rBreach)
+    if (_rBreach) _rVerdict.minors.push(_rBreach)   // §6.5 advisory in serial-only era
     // Adopt only on STRICT progress (lexicographic: fewer blockers, or same blockers + fewer
     // majors). Equal or worse ⇒ keep the prior artifact and stop — the loop improves or no-ops,
     // it never churns the artifact for a lateral trade.

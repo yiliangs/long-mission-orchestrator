@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.6
+**Version:** 0.3.7
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -580,12 +580,18 @@ merge **conflict-free by construction**. An absent write-set is conservative (se
 earns fan-out by declaring its blast radius. The actor reports its *actual* write-set on
 completion; estimate-vs-actual feeds calibration (§7).
 
-**Declared write-sets are enforced at close.** The executor diffs the actor's touched files
-against the declaration (deterministic, no model call, §1.3); any out-of-set write raises a
-**machine-evidence blocker** — human-only to waive (§2.2 truth-source asymmetry). However
-benign the edit, an actor that writes outside its declaration has invalidated the
-parallel-safety derivation; the cure is a waiver-plus-widened-declaration, never a silent
-accept.
+**Declared write-sets are observed at close, advisory in the serial-only era.** The executor
+diffs the actor's touched files against the declaration (deterministic, no model call, §1.3) and
+records any out-of-set write to the defect ledger as a **minor** finding with the full
+declared-vs-touched evidence. It does **not** gate the node and does not escalate to the Human.
+Rationale: until worktree fan-out for mutating nodes is wired, the executor runs them serially
+(§6.5 above), so the parallel-safety derivation the write-set declaration was protecting is not
+yet load-bearing — and the corpus showed every breach to date being a benign in-zone widening,
+making the human-waive step a rubber stamp on a determination the machine already settled. The
+silent-accept ban is preserved by the defect-ledger entry (the breach is recorded with evidence,
+not erased). **When worktree-isolated parallel fan-out for mutating nodes lands, this rule
+re-tightens to a machine-evidence blocker** — parallelism is what makes a write-set breach a real
+safety hazard, and the gate returns with the safety it protects.
 
 ---
 
