@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.8
+**Version:** 0.3.9
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -76,7 +76,9 @@ These are the load-bearing beliefs. Everything below is mechanism serving them.
 ## 2. Verification classes
 
 Every executable task carries a **verification class**. The class determines who is
-allowed to close the task.
+allowed to close the task. **V-class governs nodes — the small and middle work inside the
+mission DAG. The mission goal itself is V3 by definition: the human verdict at merge (§9.2)
+is its only verifier; V-class does not apply to it.**
 
 | Class | Meaning | Who closes it |
 |---|---|---|
@@ -110,8 +112,9 @@ that run become suspect and are flagged in the report.
   class. Over-verifying wastes tokens; under-verifying ships unreviewed work. The asymmetry
   is deliberate.
 - **Categorical floors (never below V2), regardless of planner judgment:** any prose
-  destined for a deliverable; anything outward-facing; the final assembly/deliverable task
-  of any mission. Deliverable zones are declared per-repo (§8).
+  destined for a deliverable; anything outward-facing; the final assembly node of any
+  mission — the node that produces the shipped artifact, distinct from the mission goal
+  itself, which is V3 by definition (above). Deliverable zones are declared per-repo (§8).
 - The plan-fight (§6) includes a **verification-adequacy lens** whose sole job is to attack
   the V-class column for obvious under-classification.
 
@@ -434,8 +437,11 @@ GOAL  (one line from the human)
 GRILL   The one human-in-the-loop conversation, right after the goal. Align on
         intent, scope, constraints, approach; surface and resolve ambiguity up
         front while the human is present (attended / launched-live: live;
-        queued / remote: criticality-split, §4). The grilled understanding
-        feeds PLAN. After GRILL, everything below runs autonomously.
+        queued / remote: criticality-split, §4). Confirm with the human what
+        their final-result verdict will look at — the goal is V3 (§2) and they
+        are its only verifier; the agent must know what "done" looks like to
+        them. The grilled understanding feeds PLAN. After GRILL, everything
+        below runs autonomously.
   │
 PLAN    Orchestrator reads constitution + repo contract + machine profile +
         (project card, if present) → drafts a DAG. Each node carries: deps,
