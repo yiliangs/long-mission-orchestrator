@@ -215,10 +215,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             } | ConvertTo-Json | Set-Content -Path $ledgerPath -Encoding UTF8
         }
 
+        # Orientation hint -- last-step.md is an optional, advisory file the orchestrator MAY write
+        # after each meaningful action ("FREEZE done, EXECUTE node 3a in flight, awaiting critic").
+        # It is NOT state -- plan.json + journal remain the source of truth per section 1.4 (memory
+        # lives on disk, re-derived). The hint just saves the resumed agent one round of grep-and-
+        # orient. Forward-compatible: absent file => no hint, current behavior unchanged. Capped at
+        # ~600 chars so a runaway append cannot pad the resume prompt.
+        $hintPath = Join-Path $cfg.run_dir 'last-step.md'
+        $hint = ''
+        if (Test-Path $hintPath) {
+            try {
+                $raw = (Get-Content $hintPath -Raw -ErrorAction Stop)
+                if ($raw.Length -gt 600) { $raw = $raw.Substring(0, 600) + '...' }
+                $hint = " Orientation hint from prior session (advisory only -- re-derive truth from plan.json + journal): " + (($raw -replace '\s+', ' ').Trim().TrimEnd('.')) + "."
+            } catch { $hint = '' }
+        }
+
         $prompt = "[heartbeat] Constitution section 11 idempotent resume beat for mission run $($cfg.run_id). " +
             "Run dir: $($cfg.run_dir). A prior orchestrator session appears dead (no activity for ${idleMin} min " +
             "- usage window, crash, or reboot). Assess state from the run dir (plan.json, journal, partial " +
-            "artifacts) and recent commits on the mission branch. Idempotency rules: (1) if the mission is " +
+            "artifacts) and recent commits on the mission branch.$hint Idempotency rules: (1) if the mission is " +
             "complete or the run dir is gone, disarm via: powershell -NoProfile -ExecutionPolicy Bypass -File " +
             "$ScriptsDir\mission_heartbeat.ps1 disarm -RunDir '$($cfg.run_dir)' and stop. (2) if the mission is " +
             "waiting on a human gate, or a live session is actively driving this run, stop without acting. " +
