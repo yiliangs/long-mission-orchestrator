@@ -292,7 +292,7 @@ Do the work on the agent branch. Then:
   list in "files_touched" — reviewers judge from what you push, so push the real thing.
 - If you discover the node's acceptance criteria are themselves wrong / a dependency
   surprise makes them unreachable: outcome="plan_assumption_false" with replan_reason.
-- Additive only: commit to the agent branch. Never merge, force-push, or act outward.`
+- Commit to the agent branch. Deletions/refactors are fine (git is the audit trail). Never force-push, rebase/amend published, merge to default, or act outward.`
 }
 
 // Shared closing contract for every gating critic (§3.3).

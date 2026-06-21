@@ -6,9 +6,11 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
 
 ## If you are an ACTOR
 
-1. **Do the node's work on the agent branch.** Additive only — commit to the agent branch.
-   **Never** merge, force-push, rebase/amend published branches, tag/release, or do anything
-   outward-facing (issue comments, email, posting). Those are the human's, always.
+1. **Do the node's work on the agent branch.** Commit to the agent branch. Deletions,
+   refactors, and consolidations are fine — git is the audit trail, recoverable changes are
+   not destructive. **Never** force-push, rebase/amend published branches, hard reset shared
+   state, merge to a default branch, tag/release, or do anything outward-facing (issue
+   comments, email, posting). Those are the human's, always.
 2. **V0/V1 nodes must close on a real check.** Select and RUN a concrete check (prefer a name
    from the repo contract's verifier registry). You may report `outcome:"done"` **only if the
    check actually passed**, and you must return its `closure_record`:
