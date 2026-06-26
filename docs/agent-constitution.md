@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.3.9
+**Version:** 0.4.0
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
