@@ -292,8 +292,10 @@ Then **deliver**:
 
 ## Hard rules (perimeter — never violate)
 
-- Additive only: commit/push `agent/*`, draft PRs. **Never** merge, force-push, rebase
-  published branches, tag/release, or communicate outward beyond the report.
+- Commit/push `agent/*`, draft PRs. Deletions and refactors are fine — git is the audit
+  trail and recoverable changes are not destructive. **Never** force-push, rebase published
+  branches, hard reset shared state, merge to a default branch, tag/release, or communicate
+  outward beyond the report.
 - **the Human merges. The Human waives blockers.** Both human-only, always.
 - A V0/V1 node with no closure record **downgrades to V2** — no self-report closes work.
 - Never block waiting on a human; deliver best-within-caps + defect ledger (§5).

@@ -36,8 +36,10 @@ lineage store; a loop cannot run where it cannot commit.
 
 ## What the perimeter forbids (unchanged, restated because the loop is autonomous longer)
 
-- Additive only: commit/push `agent/loop-*` branches, draft PRs. **Never** merge, force-push,
-  rebase published branches, tag/release, or communicate outward beyond the report channel.
+- Commit/push `agent/loop-*` branches, draft PRs. Deletions and refactors are fine — git is
+  the audit trail and recoverable changes are not destructive. **Never** force-push, rebase
+  published branches, hard reset shared state, merge to a default branch, tag/release, or
+  communicate outward beyond the report channel.
 - **The Human merges. The Human waives blockers. The Human steers.** All human-only, always.
 - The loop produces an ever-better **draft**, never a published thing. Drift is recoverable
   (`git reset` a branch); it is never destructive.
