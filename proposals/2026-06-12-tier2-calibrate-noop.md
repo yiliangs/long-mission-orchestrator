@@ -85,3 +85,48 @@ _(none — all caps Leave)_
 Applying this proposal changes **nothing** in `docs/agent-constitution.md` §6.2 (no version bump
 on the caps). Acting on H1 unblocks the first real v0.3.3 calibration once ≥10 properly-tagged
 records accumulate. No PERIMETER (§9) clause is touched.
+
+## Audit verdict (2026-06-19, `/mission-log-audit` — Human: "go with rec")
+
+- **Cap no-op:** confirmed. §6.2 unchanged. No re-surface.
+- **H1 — RESOLVED.** The DELIVER-time writer was already fixed (deployed `~/.claude/commands/mission.md`
+  §274–279 now mandates `constitution_version` on every cap-log line; all records from
+  `2026-06-12-stackmix-web-port` onward carry it). Only the back-fill remained. Done — but the
+  rec's placeholder value (`0.3.3`) was **wrong** and the "confirm before back-fill — do not guess"
+  guard caught it: each unstamped line was stamped with the version **verified from its own
+  mission-record**, not 0.3.3. Four lines back-filled (not the two originally named — two more
+  06-12 lines were also unstamped): `20260611-jobe-submit-audit` → `0.3.1`,
+  `web-ui-port-20260611` → `0.3.1`, `arch-cleanup-20260612` → `0.3.2`,
+  `2026-06-12-web-port-roommix-packaging` → `0.3.1`. Net effect: lines are now correctly
+  version-partitioned (no longer silently dropped), though each per-version group is still n≤2,
+  so no calibration triggers yet.
+- **H2 — DEFERRED** by the Human; re-examine on recurrence. Note for the next audit: the
+  budget-overrun pattern has **already recurred and the logging is inconsistent** —
+  `arch-cleanup-20260612` overran `agent_budget` 24→25 *and* recorded the cap_hit; the original
+  `20260611-jobe-submit-audit` overran 36→38 but recorded `cap_hits:[]` (the overrun never landed
+  in the calibration corpus). So the real H2 issue is twofold: (a) spawn-time ceiling not enforced,
+  and (b) the overrun isn't always logged as a §6 `cap_hit` (node `"mission"`). If a third overrun
+  appears, promote to investigation.
+
+### H2 update — 2026-06-26 — PROMOTED
+
+The third overrun has appeared: `2026-06-21-thumbnailbar-web-port` overran `agent_budget`
+43/40 and **did** record the cap_hit (with the new `would_have_converged: true` field). Per
+the rule above, H2 is **PROMOTED to investigation.**
+
+Updated diagnosis from the third data point:
+- **Issue (b) — mostly resolved.** Both recent overruns (`arch-cleanup`, `thumbnailbar`)
+  logged the `cap_hit`; the original `jobe-submit-audit` gap is an older-writer artifact.
+  The current DELIVER-time writer catches mission-level cap_hits reliably.
+- **Issue (a) — still live, now thrice-confirmed.** The executor permits
+  `agents_spawned > agent_budget` rather than refusing at the ceiling. §6.4 frames budget
+  exhaustion as a *divergence* — "stop opening new nodes, let in-flight nodes close" — but
+  the observed behavior is "keep opening past the ceiling, record overshoot post-hoc." A
+  60% overrun rate (3/5 M2 runs since 2026-06-11) is no longer noise.
+
+  Suggested next step: a focused investigation into where in the executor's spawn loop the
+  `agent_budget` check fires (or doesn't) — `budgetExhausted()` in
+  `executors/mission-executor.workflow.js` returns the right answer, but the call site that
+  consumes it apparently doesn't honor it as a hard stop for the wave currently in flight.
+  A real fix should preserve §6.4's "in-flight nodes complete" rule while preventing new
+  spawns from being enqueued once the ceiling is crossed.
