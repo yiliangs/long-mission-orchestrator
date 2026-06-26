@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import argparse
 import html as _html
+import json
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-import mailbridge
+import channelbridge   # shared claude-channel transport (replaces the retired local mailbridge.py)
 
 # Router permissions: ALLOWLIST, not bypass+denylist. The reply body is untrusted input fed
 # to an agent — blacklisting an LLM's action space against injection is the wrong polarity
@@ -47,6 +48,7 @@ _ALLOW_PROPOSAL = [
     "Bash(bash scripts/deploy.sh:*)", "Bash(sh scripts/deploy.sh:*)",
     "Bash(python:*)", "Bash(node:*)",                          # validators / classifier
 ]
+_ALLOW_REQUEST = ["Read", "Glob", "Grep"]   # fresh free-form request: read-only triage, never acts
 # §9 perimeter — shapes the router must never use even if an allow pattern would cover them.
 _DENY = [
     "Bash(git merge:*)", "Bash(git push --force:*)", "Bash(git push -f:*)",
@@ -62,8 +64,8 @@ REPOS = Path.home() / "source" / "repos"
 def cmd_report(args) -> None:
     path = Path(args.file) if args.file else Path(".mission") / args.run_id / "REPORT.md"
     body = _stamp(_read(path))
-    subject = f"[LMO report {args.run_id}] {_verdict_line(body)}"
-    recipient, mid = mailbridge.send(subject, body, _md_html(body), kind="report", ref=args.run_id)
+    subject = f"report {args.run_id} - {_verdict_line(body)}"   # [LMO] prefix added by the channel signature
+    recipient, mid = channelbridge.send("lmo", subject, body, _md_html(body), kind="report", ref=args.run_id)
     print(f"emailed report {args.run_id} to {recipient} ({mid})")
 
 
@@ -71,8 +73,8 @@ def cmd_walkthrough(args) -> None:
     path = Path(args.file)
     body = _stamp(_read(path))
     ref = args.ref or path.stem
-    subject = f"[LMO walkthrough {ref}] decisions need you"
-    recipient, mid = mailbridge.send(subject, body, _md_html(body), kind="walkthrough", ref=ref)
+    subject = f"walkthrough {ref} - decisions need you"
+    recipient, mid = channelbridge.send("lmo", subject, body, _md_html(body), kind="walkthrough", ref=ref)
     print(f"emailed walk-through {ref} to {recipient} ({mid})")
 
 
@@ -82,34 +84,30 @@ def cmd_proposal(args) -> None:
     footer = ("\n\n---\nTo APPLY this amendment, reply:  GRANT <your grant-secret>\n"
               "To decline or comment, just reply with your reasoning.\n")
     body = _stamp(body + footer)
-    subject = f"[LMO proposal {args.id}] amendment - reply GRANT <secret> to apply"
-    recipient, mid = mailbridge.send(subject, body, _md_html(body),
-                                     kind="proposal", ref=args.id)
+    subject = f"proposal {args.id} - amendment, reply GRANT <secret> to apply"
+    recipient, mid = channelbridge.send("lmo", subject, body, _md_html(body),
+                                        kind="proposal", ref=args.id)
     print(f"emailed proposal {args.id} to {recipient} ({mid})")
 
 
 # --- inbound -----------------------------------------------------------------
 
-def cmd_poll(_args) -> None:
-    n = mailbridge.poll(_handle_reply)
-    print(f"handled {n} feedback repl{'y' if n == 1 else 'ies'}")
+def cmd_route(_args) -> None:
+    """Dispatcher entrypoint (shared claude-channel): route ONE reply, read as JSON on stdin.
 
-
-def _handle_reply(ctx: dict) -> bool:
-    kind, ref, reply = ctx["kind"], ctx["ref"], ctx["command"]
-    if not reply:
-        print(f"[mailbox] skip {ctx['message_id']}: empty reply body")
-        return False
+    The shared dispatcher owns inbox ingress and demux; for a reply tagged ``app=lmo`` it invokes
+    this with the reply context (``{kind, ref, command, ...}``) on stdin, and emails our stdout
+    back as the acknowledgement. So this is ``_handle_reply`` minus the transport: same GRANT check
+    and same constrained verdict/amendment router, no inbox of our own.
+    """
+    ctx = json.load(sys.stdin)
+    kind, ref, reply = ctx.get("kind"), ctx.get("ref"), ctx.get("command", "")
     grant_ok = _grant_present(reply)
-    print(f"[mailbox] routing {kind} reply for {ref!r} (grant={'yes' if grant_ok else 'no'})")
-    result = _route(kind, ref, reply, grant_ok)
-    mailbridge.send(ctx["reply_subject"], result, _md_html(result),
-                    to=ctx["sender"], in_reply_to=ctx["message_id"], kind="ack", ref=ref)
-    return True
+    print(_route(kind, ref, reply, grant_ok))
 
 
 def _grant_present(reply: str) -> bool:
-    secret = mailbridge.config().get("GRANT_SECRET")
+    secret = channelbridge.config().get("GRANT_SECRET")
     return bool(secret) and secret in reply
 
 
@@ -118,7 +116,7 @@ def _route(kind: str, ref: str, reply: str, grant_ok: bool) -> str:
     if not claude:
         return "Router unavailable: the `claude` CLI is not on PATH."
     cwd, prompt = _router_plan(kind, ref, reply, grant_ok)
-    allow = _ALLOW_PROPOSAL if kind == "proposal" else _ALLOW_VERDICT
+    allow = {"proposal": _ALLOW_PROPOSAL, "request": _ALLOW_REQUEST}.get(kind, _ALLOW_VERDICT)
     cmd = [claude, "-p", prompt,
            "--max-turns", "20", "--output-format", "text",
            "--allowedTools", *allow, "--disallowedTools", *_DENY]
@@ -135,7 +133,25 @@ def _router_plan(kind: str, ref: str, reply: str, grant_ok: bool) -> tuple[Path,
     if kind == "proposal":
         return _lmo_dir(), _PROPOSAL_PROMPT.format(
             ref=ref, reply=reply, grant="GRANTED" if grant_ok else "NOT GRANTED")
+    if kind == "request":
+        return _lmo_dir(), _REQUEST_PROMPT.format(reply=reply)
     return _fieldnotes_dir(), _VERDICT_PROMPT.format(ref=ref, reply=reply)
+
+
+_REQUEST_PROMPT = """You are Claude Code, handling a FRESH email request from Yiliang (the Human, \
+the sole authority) addressed to the long-mission-orchestrator project. You are in the LMO repo, \
+and you are READ-ONLY — you may inspect, but must not change, launch, commit, or push anything.
+
+The Human's request (verbatim):
+---
+{reply}
+---
+
+This arrived unprompted over email — a triage surface, not an execution one. You CANNOT launch a \
+mission or take action from here. Reply with: (a) a one-line restatement of what they're asking, \
+(b) whether it's actionable in LMO, and (c) the exact next step to run in an interactive session \
+(e.g. `/mission \"<goal>\"`, `/mission-loop ...`, or a specific command). Be concise — your entire \
+stdout becomes the reply email."""
 
 
 _VERDICT_PROMPT = """You are Claude Code, routing an AUTHENTICATED email reply from Yiliang (the \
@@ -202,11 +218,11 @@ Your entire stdout becomes the confirmation email — end with 1-3 lines stating
 # --- helpers -----------------------------------------------------------------
 
 def _fieldnotes_dir() -> Path:
-    return Path(mailbridge.config().get("FIELDNOTES_DIR") or (REPOS / "claude-fieldnotes"))
+    return Path(channelbridge.config().get("FIELDNOTES_DIR") or (REPOS / "claude-fieldnotes"))
 
 
 def _lmo_dir() -> Path:
-    return Path(mailbridge.config().get("LMO_DIR") or (REPOS / "long-mission-orchestrator"))
+    return Path(channelbridge.config().get("LMO_DIR") or (REPOS / "long-mission-orchestrator"))
 
 
 def _read(path: Path) -> str:
@@ -260,8 +276,8 @@ def main() -> None:
     p.add_argument("--file", help="explicit proposal path (default proposals/<id>.md)")
     p.set_defaults(func=cmd_proposal)
 
-    p = sub.add_parser("poll", help="poll the inbox and route any feedback replies")
-    p.set_defaults(func=cmd_poll)
+    p = sub.add_parser("route", help="shared-dispatcher entrypoint: route one reply ctx (JSON on stdin)")
+    p.set_defaults(func=cmd_route)
 
     args = parser.parse_args()
     args.func(args)
