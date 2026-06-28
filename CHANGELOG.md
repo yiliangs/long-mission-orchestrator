@@ -25,7 +25,7 @@ and nothing made "measure before claiming" a close-condition.
   project_card_schema.md` + both synth paths (`synthesizer.py`, `rebuild_cards.py`) now record
   a binding rule only if it passes a filter (non-derivable · live · costly-or-recurring ·
   checkable) and at the **smallest non-derivable class** that stays checkable — organ-specific
-  symptoms of one cause are promoted into a single class rule (`(instances: …)`), not appended
+  symptoms of one cause are promoted into a single class rule (`(instances — …)`), not appended
   as siblings. Keeps the always-on list small *and* covering organs not yet hit.
 
 Builds on 0.4.0 (unreleased in this changelog).
