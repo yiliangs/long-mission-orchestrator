@@ -3,6 +3,33 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.4.1] — 2026-06-28
+
+Coverage-honesty release. Closes the gap a `/mission-log-audit` diagnosis surfaced: a machine
+check can be *executed, passing, and recorded* (§2.1) yet **blind to the property the node
+claims** — webshot green while "the window doesn't jump" / "the bar is concentric" went
+unverified. Two web-overlay missions (thumbnailbar freeze, commandbar's six in-Rhino rounds)
+re-hit the same class because the failure corpus recorded yesterday's *organ*, not the *class*,
+and nothing made "measure before claiming" a close-condition.
+
+### Added
+- **§2.1a Coverage honesty (the check must exercise the claim).** A passing check only
+  licenses the property it actually exercises; in a per-repo **machine-blind zone** (runtime,
+  rendered geometry, thread/timing) a green-but-blind check is never a close — the node carries
+  a **measured assertion** or ships a `V3-deferred: <property>` open item in the defect ledger
+  (visible, not blocking). The §2.1 audit question "was the check sufficient" gains a close-time
+  twin.
+
+### Changed (fieldnotes synth — the failure-mode corpus)
+- **Binding-rule capture is now class-first, filtered, promote-not-append.** `schemas/
+  project_card_schema.md` + both synth paths (`synthesizer.py`, `rebuild_cards.py`) now record
+  a binding rule only if it passes a filter (non-derivable · live · costly-or-recurring ·
+  checkable) and at the **smallest non-derivable class** that stays checkable — organ-specific
+  symptoms of one cause are promoted into a single class rule (`(instances: …)`), not appended
+  as siblings. Keeps the always-on list small *and* covering organs not yet hit.
+
+Builds on 0.4.0 (unreleased in this changelog).
+
 ## [0.3.6] — 2026-06-12
 
 Audit-follow-up release, closing three gaps a post-mission audit surfaced: a disclosure gap

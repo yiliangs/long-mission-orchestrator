@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.4.0
+**Version:** 0.4.1
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -105,6 +105,31 @@ The audit phase (§6) re-runs **all** recorded checks (cheap, deterministic) and
 judge-samples 2–3 self-closures for "was the check actually sufficient." A sampled task
 that fails its own recorded check is a constitution-level incident: all self-closures in
 that run become suspect and are flagged in the report.
+
+### 2.1a Coverage honesty (the check must exercise the claim)
+
+A closure record (§2.1) only licenses the property it **actually exercises**. A check that
+ran and passed but is *blind to the claimed property* is not a self-close of that property —
+it is model-judgment wearing a machine-proven costume (§2.3).
+
+This bites in a **machine-blind zone**: where the property claimed is one the bound check
+provably cannot observe — live runtime behavior, rendered geometry, thread/timing effects,
+anything a per-repo contract declares machine-blind (§8). There, "compile / lint /
+headless-test green" + "looks / sounds right" is **never** a close for that property. The node
+closes it one of two ways:
+
+- a **measured assertion** — a real measurement of the property itself (e.g. a rendered-DOM
+  measurement, an in-runtime smoke result), recorded like any closure record; or
+- a `V3-deferred: <property>` line shipped in the defect ledger (§5) as an **open** item — the
+  property is honestly marked unverified and routed to the human smoke (§9.2), not silently
+  closed.
+
+The test is not "prove the check covers everything" (impossible — it would over-fire); it is
+"does a *recognized* gap exist between what the check sees and what the node claims." Where one
+does, the gap is made **visible**, never papered over. The §2.1 audit question "was the check
+actually sufficient" thus has a close-time twin: a check blind to its claim was never
+sufficient, no matter how green. (This is the §2.3 honesty clause applied to *coverage* —
+the recurring way a model-eyeballed property ships as "done" past a green but blind gate.)
 
 ### 2.2 Classification discipline
 

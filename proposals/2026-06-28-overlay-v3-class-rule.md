@@ -1,8 +1,43 @@
 # Promote the live-overlay failure CLASS to an agent-facing preventive rule (2026-06-28)
 
-Status: **draft — nothing applied; awaiting Human review per §13.** Direction accepted by the
-Human in /mission-log-audit 2026-06-28 (items 3 + 4); the specific contract wording below is the
-proposal.
+Status: **APPLIED 2026-06-28** (fork (a) — full mechanism, on explicit Human instruction
+"wire the full mechanism in", which supersedes the proposal's own conservative (c)
+recommendation). What landed:
+
+- **Teeth — constitution §2.1a "Coverage honesty"** (both copies, version 0.4.0 → **0.4.1**,
+  CHANGELOG + operating-card worker line + deployed): a passing check only closes the property
+  it exercises; in a machine-blind zone a green-but-blind check is no close — measure or ship
+  `V3-deferred: <property>` open in the defect ledger.
+- **Engine — fieldnotes synth made class-first / filtered / promote-not-append**:
+  `schemas/project_card_schema.md` (the filter test + "what earns a rule" + promote-organ→class)
+  and both synth paths (`synthesizer.py`, `rebuild_cards.py`).
+- **Loop — `evolve.md` Tier-3** gained the **revealed-hardness (clarification) signal** as a
+  typed, positive-only escalator, applied by the human-in-loop audit (NOT auto-counted in the
+  synth — deliberately staged, see caveats).
+
+### Retro-test (replay command-bar's actual defects against §2.1a) — reasoning, not execution
+
+| command-bar defect | Under §2.1a |
+|---|---|
+| concentricity claimed unmeasured | **Direct catch.** Geometry property, webshot-blind → cannot close on "looks right"; must measure (catches 17px ≠ 6px) or mark `V3-deferred`. |
+| window-jump (measure-resize) | Runtime/geometry, webshot-blind → measured assertion or open marker; not silently "done". |
+| tooltip clip / lingering | Live click-through runtime, webshot-blind → same: surfaced, not closed green. |
+
+And the synth change means these three become **one class rule** ("live overlay is webshot-blind;
+measure/smoke runtime+geometry"), so the *next* new organ inherits the guard instead of
+re-teaching it.
+
+**Honest caveats (this is wired, believed-correct, NOT verified-in-anger):**
+1. §2.1a converts a *silent* close into a *required choice* (measure or mark-open) — it does not
+   guarantee the agent measures *correctly*; a determined "looks right" can still rationalize. It
+   is necessary, not sufficient; the critic must enforce "is this property machine-blind? then
+   demand a measurement." Real proof needs the next overlay mission.
+2. It currently keys off "the repo contract marks the zone machine-blind" — natalie's contract
+   does not yet *declare* an explicit machine-blind zone (the rule still works via "property the
+   check provably can't observe", but an explicit §8 declaration would sharpen it). Left as a
+   follow-up; not edited here to keep blast radius small.
+3. Maker/checker: I both diagnosed and wired this — a cold adversarial review is the right next
+   check before trusting it (same blindspot risk that let command-bar ship).
 
 ## Trigger
 

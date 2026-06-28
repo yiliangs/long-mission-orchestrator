@@ -41,6 +41,18 @@ Reads the full run-records, not just caps. Looks for **patterns that justify rul
   sharper close-time binding, or move a task pattern to a categorical V2 floor (§2.2).
 - **Escalation precision** — falling blocker legit-rate → propose tighter critic prompts or
   sharper acceptance-criteria conventions (§3.3).
+- **Revealed hardness (the clarification signal)** — back-and-forth with the Human is a
+  *runtime* hardness signal the static mission-class (§2.4) cannot see — but only once
+  **typed**. A correction round is one of: intrinsic-hard (V3 / judgment), underspecified
+  brief, agent defect, or taste iteration — and only the **first** is hardness; raw
+  round-count conflates all four (the same brief that's vague, the same stakeholder that's
+  fickle). The audit (human-in-loop, `/mission-log-audit`) does the typing; this is **not**
+  auto-counted in the synth. Use it as a **positive-only escalator**: recurring
+  *intrinsic-hard* touch on a zone or node-class → propose raising that zone's default V-floor
+  (§2.2) and promoting its symptom rules into one class rule + a §2.1a machine-blind
+  declaration. Never the inverse — the *absence* of clarification does **not** certify "easy"
+  (the worst defects are hard things shipped on false confidence, no questions asked). It may
+  promote a problem into the heavy-verification bucket; it may never demote one out.
 - **Replan churn** — recurring `plan_assumption_false` on similar nodes → propose a planning
   rule or a contract-template field that pre-empts it.
 - **Accepted-major patterns** — the same major repeatedly accepted-with-reason → maybe it

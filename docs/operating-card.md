@@ -21,6 +21,14 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
    verbatim** — don't re-quote or translate paths; shell-quoting drift causes spurious check
    failures. Stamp the `closure_record` timestamp with **real wall-clock time** from your
    environment, never a placeholder.
+   - **The check must exercise the claim (§2.1a).** A passing check only closes the property it
+     actually observes. If you claim a property the check is *blind* to — live runtime behavior,
+     rendered geometry, thread/timing, anything the repo contract marks machine-blind (e.g. a
+     headless/webshot pass cannot see a window jump, a clipped tooltip, whether a bar is
+     concentric) — "green + looks right" is **not** a close. Either return a **measured
+     assertion** of the property itself (measure the rendered geometry, run the in-app smoke), or
+     ship `V3-deferred: <property>` in the defect ledger as an **open** item. Never report a
+     machine-blind property "done" on an eyeball.
 3. **Push your evidence.** Return the raw `git diff` of your changes and the file list —
    reviewers judge from what you push, not by re-exploring the repo. Push the real thing.
 4. **If told to self-audit (R0):** after the check passes, stop, switch roles, and attack your
