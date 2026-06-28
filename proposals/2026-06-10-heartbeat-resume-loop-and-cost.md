@@ -51,6 +51,24 @@ Recommendation: **(b) as the default, (a) only for runs you explicitly bless.** 
 turns every dead mission into a standing headless agent with broad autonomy — exactly the blast
 radius the perimeter exists to bound.
 
+> **Resolution (Human, 2026-06-28, via /mission-log-audit item 1 = "1a").** Chose **(a) pre-grant
+> the Workflow tool for *blessed* runs only** (not blanket — blanket = the rejected wider-blast-radius
+> option), **plus investigate the new "control-character" dispatch guard.** Two things follow, kept
+> distinct:
+> 1. **"Blessed-only" is launch-time, not a `settings.json` blanket allow.** A `permissions.allow`
+>    entry for Workflow is global and would *be* option (b)'s blast radius — which the Human did
+>    NOT choose. So the blessing stays per-invocation, authorized when the heartbeat is armed for a
+>    specific mission (exactly the model already written in `skills/mission.md` §autonomy-gate: "No
+>    `settings.json` pre-grant; scoped to that single headless invocation, authorized by the human at
+>    launch"). **Action: no global settings grant; confirm the launch-time grant path actually
+>    threads through to the resumed headless executor.** Surface back to the Human if it can't be done
+>    per-invocation and genuinely needs a standing grant.
+> 2. **The June-27 control-character guard is a separate, attended-session bug** (it blocked dispatch
+>    even with a human present, where the permission prompt is answerable). Owner: orchestrator to
+>    reproduce with a minimal Workflow probe and characterize what the guard inspects (the venue
+>    mission proved an ASCII-clean copy still failed — so it is not the box-drawing glyphs).
+>    `[believed, not yet reproduced this session]`
+
 ## C. Decision — a verifier model-tier lever (cost vs gate quality)
 
 I deliberately **did not** downgrade the EXECUTE-phase critics/improvers to a cheaper model, even
