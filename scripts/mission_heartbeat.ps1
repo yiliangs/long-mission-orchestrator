@@ -36,7 +36,13 @@ $ScriptsDir = Join-Path $env:USERPROFILE '.claude\scripts'
 function Log([string]$msg) {
     $line = "{0:yyyy-MM-dd HH:mm:ss}  {1}" -f (Get-Date), $msg
     Write-Host $line
-    Add-Content -Path $LogFile -Value $line
+    # Best-effort append: concurrent beats (or an interactive session tailing the log) can hold
+    # the file, and under $ErrorActionPreference='Stop' a single failed Add-Content would abort the
+    # whole beat. Logging is telemetry, never load-bearing -- retry briefly, then give up silently.
+    for ($i = 0; $i -lt 5; $i++) {
+        try { Add-Content -Path $LogFile -Value $line -ErrorAction Stop; break }
+        catch { Start-Sleep -Milliseconds 60 }
+    }
 }
 
 # Claude Code encodes a path into a projects/ dir name by replacing every non-alphanumeric
