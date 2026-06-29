@@ -67,7 +67,17 @@ radius the perimeter exists to bound.
 >    even with a human present, where the permission prompt is answerable). Owner: orchestrator to
 >    reproduce with a minimal Workflow probe and characterize what the guard inspects (the venue
 >    mission proved an ASCII-clean copy still failed — so it is not the box-drawing glyphs).
->    `[believed, not yet reproduced this session]`
+>
+>    **Probe result (2026-06-28):** a minimal multi-line Workflow script dispatched **cleanly**
+>    (runId `wf_c324ff20-ef6`, returned `probe-ok` in 5 ms, **no control-character rejection**). So
+>    the Workflow tool itself is **not** broken in this environment — the guard is NOT a blanket
+>    block. The June-27 failure was therefore **upstream / script-specific**: in how the executor was
+>    *invoked* (the ~50 KB `mission-executor.workflow.js` passed through the executor-skill's dispatch
+>    construction), not in Workflow dispatch per se. Remaining unknown: what about that specific
+>    invocation tripped it — leading hypotheses are the script's size or the dispatch path's
+>    encoding/escaping of the large multi-line `script` field. Next probe (deferred): dispatch the
+>    actual 50 KB executor (or a large/non-ASCII script) to narrow it. `[tool works — verified; the
+>    exact upstream trigger — not yet isolated]`
 
 ## C. Decision — a verifier model-tier lever (cost vs gate quality)
 
