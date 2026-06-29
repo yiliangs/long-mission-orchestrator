@@ -717,6 +717,11 @@ onboarding a repo costs minutes, not an essay.
 - **Compute** — role requirements (e.g. `training: requires role=heavy`); bound to a
   physical machine at runtime via the machine profile (§10, machine-profile.md).
 - **Cap overrides** — each with a reason string.
+- **Machine-blind zones (§2.1a)** — path globs and/or property classes the repo declares its
+  machine checks provably cannot observe (e.g. live runtime, rendered geometry, thread/timing).
+  In them, a passing check does not close the blind property — close on a measured assertion or
+  ship `V3-deferred` (§2.1a). Absent, §2.1a still applies via its own enumerated property classes;
+  declaring zones makes the boundary objective rather than the executor's judgment to recognize.
 
 ---
 

@@ -52,7 +52,9 @@ Reads the full run-records, not just caps. Looks for **patterns that justify rul
   (§2.2) and promoting its symptom rules into one class rule + a §2.1a machine-blind
   declaration. Never the inverse — the *absence* of clarification does **not** certify "easy"
   (the worst defects are hard things shipped on false confidence, no questions asked). It may
-  promote a problem into the heavy-verification bucket; it may never demote one out.
+  promote a problem into the heavy-verification bucket; it may never demote one out. A floor
+  raised this way carries a `review-by` note (re-tested at the next §2.2 capability re-baseline)
+  so the ratchet has a release valve and does not accrete verification burden permanently.
 - **Replan churn** — recurring `plan_assumption_false` on similar nodes → propose a planning
   rule or a contract-template field that pre-empts it.
 - **Accepted-major patterns** — the same major repeatedly accepted-with-reason → maybe it
