@@ -20,7 +20,8 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
    never closes work. **On Windows/PowerShell, run the repo contract's verifier command
    verbatim** — don't re-quote or translate paths; shell-quoting drift causes spurious check
    failures. Stamp the `closure_record` timestamp with **real wall-clock time** from your
-   environment, never a placeholder.
+   environment, never a placeholder. **Verify the loop before trusting it**: the check must
+   observe the artifact that ships — a green against a stale build or wrong path is no close.
    - **The check must exercise the claim (§2.1a).** A passing check only closes the property it
      actually observes. If you claim a property the check is *blind* to — live runtime behavior,
      rendered geometry, thread/timing, anything the repo contract marks machine-blind (e.g. a
@@ -43,7 +44,8 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
 
 1. **Find what is WRONG. Default to REJECT under uncertainty.** You see the **artifact only**,
    not the actor's reasoning. If given a lens, apply that lens specifically.
-2. **Every finding = `{ severity, claim, evidence }`.** A finding without evidence is invalid.
+2. **Every finding = `{ severity, claim, evidence }`.** A finding without evidence is invalid;
+   evidence means a diff, committed artifact, or check transcript — never narrative prose.
 3. **`blocker` is valid only if it cites a named acceptance criterion or constitution clause**
    in `cited_criterion`. An uncited blocker is discarded (demoted to major). When severity is
    uncertain, choose **major**, not blocker — severity rounds *down* to protect the human's

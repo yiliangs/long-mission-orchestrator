@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.4.4
+**Version:** 0.5.0
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -19,8 +19,8 @@ keeps future amendments honest about what they are touching.
 
 **0.1 The policy core — capability-invariant.** These hold for any model, however strong,
 because they are claims about *evidence and authority*, not about model skill: the V-ladder
-and truth-source asymmetry (§2 — self-report is testimony, not proof; a stronger model gives
-*more convincing* testimony, which makes the distinction more load-bearing, never less);
+and truth-source asymmetry (§2 — a stronger model gives *more convincing* testimony, never
+truer, so the distinction only grows more load-bearing);
 close-time binding with recorded, re-executable checks (§2.1); the perimeter and the Human's
 merge/waiver monopoly (§9 — principal-agent machinery, and demand for it grows with every
 increase in what is delegated); evidence-class legibility in reporting (§12 — human attention
@@ -58,14 +58,12 @@ These are the load-bearing beliefs. Everything below is mechanism serving them.
    filesystem (plan, repo, prior artifacts). Nothing load-bearing depends on conversation
    memory. Fresh context per stage beats one long context that rots.
 5. **History-overriding is forbidden; reversible is permitted.** Git is the audit trail.
-   Anything recoverable from git history — deleting files, removing prose, refactoring code,
-   consolidating modules — is not destructive and is permitted. The forbidden category is
-   **history rewrites** (force-push, rebase or amend published branches, hard reset on
-   shared state) and **outward broadcasting** (merge to a default branch, tag/release,
-   external communication beyond reports); the operational list is §9.1. Refusing to delete
-   stale content because "destructive is forbidden" is a misreading of this rule and itself
-   a defect — the sanctioned removal path is the deletion pattern (§0.2, docs/evolve.md).
-   At the content level, modify-in-place, consolidation, and delete-and-replace are
+   Anything recoverable from git history — deletion, refactor, consolidation — is not
+   destructive and is permitted. The forbidden categories are **history rewrites** and
+   **outward broadcasting**; the operational list lives in §9.1 **only**, so it cannot
+   fork. Refusing to delete stale content because "destructive is forbidden" is a
+   misreading of this rule and itself a defect — the sanctioned removal path is the
+   deletion pattern (§0.2, docs/evolve.md). Modify-in-place and delete-and-replace are
    *preferred* over accretion.
 6. **The system evolves on evidence, never on vibes.** Caps, rules, and the constitution
    itself change only through run-records that justify the change, batched and approved
@@ -99,7 +97,9 @@ A V0/V1 task **cannot close** without a **closure record**:
 time, not at plan time**: the planner may assign V0/V1 with `check: TBD`; the executor
 selects and runs the concrete check when it has maximum information. **No valid closure
 record → the task is automatically downgraded to V2 and a critic is spawned.** No
-exceptions. This rule *is* what V0/V1 means.
+exceptions. This rule *is* what V0/V1 means. And the record binds to the artifact that
+ships: a green check against a stale build, wrong path, or non-shipping copy is a
+disconnected oracle — no closure (§6.1 rung 0).
 
 The audit phase (§6) re-runs **all** recorded checks (cheap, deterministic) and
 judge-samples 2–3 self-closures for "was the check actually sufficient." A sampled task
@@ -216,10 +216,11 @@ Three rules keep this safe:
    final-deliverable critic binds — not a waiver of one.
 2. **Round up under uncertainty** — same asymmetry as §2.2. A mission borderline between two
    classes takes the **higher**. M0 is granted only when its gate provably holds. **The classifier
-   computes a binding floor in code; the planner may only *raise* ceremony above it (judgment like
-   "high-stakes" → M2), never lower it** — and the executor re-derives the same floor as a backstop
-   (a hand-edited or under-classified plan cannot make M0 skip FIGHT/audit/go-gate). The "no model
-   call" guarantee is real because the floor is a script, not an LLM self-label.
+   computes a binding floor in code; the planner may only *raise* ceremony above it, never lower
+   it** — and the executor re-derives the same floor as a backstop (an under-classified plan cannot
+   make M0 skip FIGHT/audit/go-gate). The script's field yield is the M0/M1 line; every observed
+   M2 arrived as a judgment raise — that is the design working, not a defect: campaign-ness is
+   rarely legible in plan facts, so the script guards the floor and judgment supplies the top.
 3. **Promotion is free; demotion is not.** A mission may be promoted mid-flight (a subtree
    replan that grows the DAG past M0's bounds, or a newly discovered outward surface, promotes
    it and arms the machinery it now needs). It is **never silently demoted**. Initial
@@ -280,7 +281,8 @@ floor; never below it.**
 3. **Refute-framed.** The critic is instructed to *find what is wrong*, defaulting to
    reject under uncertainty. Un-prompted critics converge sycophantically.
 4. **Evidence-bound.** Every finding = `{ severity, claim, evidence, suggested_fix }`. A
-   finding without evidence is **invalid** and rejected by the orchestrator.
+   finding without evidence is **invalid** and rejected by the orchestrator. Evidence means
+   a diff, committed artifact, or check transcript — narrative prose alone is not evidence.
 
 ### 3.3 Severity and adjudication
 
@@ -338,24 +340,19 @@ it does **not** kill critic-over-rounds staleness. Cold-reviewer rotation does.
   uncapped rotation would thrash. Citation-gating (§3.3) filters their noise, and the cold
   reviewer is told not to manufacture issues to seem useful.
 
-**Token discipline (this must not burn the budget):** detection is free (deterministic, no
-LLM); a cold reviewer fires **only at a candidate-terminal**, never per round, and in the
-reference executor **only to double-check a *clean* verdict on a high-stakes node** — a stale
-green is the dangerous case; a review that already found issues needs no confirmation.
-Reserved to the **plan-fight and the final deliverable**, never routine nodes; net cost is at
-most one extra critic call per mission. Its thresholds are **evolution-tuned caps** (§6.2, §7):
-design adds the nerve, data tunes its sensitivity.
+**Token discipline:** detection is free (deterministic, no LLM); a cold reviewer fires **only
+at a candidate-terminal**, and only to double-check a *clean* verdict on a high-stakes node
+(plan-fight, final deliverable) — a stale green is the dangerous case; a review that already
+found issues needs no confirmation. Net cost ≤1 extra critic call per mission; thresholds are
+**evolution-tuned caps** (§6.2, §7).
 
 ### 3.5 Cold improver — fresh eyes that lift the draft (not a gate)
 
 §3.4's cold reviewer is a *verifier*: it confirms a clean terminal is genuinely converged, so
 finding nothing is a **success**. A second, distinct use of cold review is an *improver*: fresh
 independent eyes on a **first-draft** artifact whose job is to make it stronger, fed back to the
-actor for a revision it adopts with its own judgment. The first daylight mission exposed why
-this matters — the cold *verifier*, fired on an already-thrice-reviewed final summary, correctly
-found nothing; the high-yield position for cold review is the **fresh implementation draft**,
-where independent eyes reliably surface real improvements, and where the executor previously had
-**no path back to the actor** to act on them.
+actor for a revision it adopts with its own judgment. The high-yield position for cold review
+is the **fresh implementation draft**, not the already-multiply-reviewed final summary.
 
 | | Cold verifier (§3.4) | Cold improver (§3.5) |
 |---|---|---|
@@ -394,8 +391,7 @@ consequence — any gate — does not. The cost case is favourable by constructi
 **minority** of spawns and the descent-eligible actors are the **mass**, so Opus lands where the
 stake is and the savings land where it isn't.
 
-**When it is unclear, blurry, or hard to call — round up.** This is the standing tie-breaker, the
-same asymmetry as V-class and M-class: cheapness is never the default a doubt resolves toward.
+**When the call is blurry — round up (§2.2).** Cheapness is never what a doubt resolves toward.
 
 **Haiku is opt-in, never derived.** No floor is Haiku. A V0/V1 actor drops to Haiku only when the
 planner sets `model_tier: "haiku"` **with** a one-line `model_rationale` asserting the node is
@@ -437,16 +433,12 @@ and only resorts to assumption when the dependent branches are all that remain.
 
 ## 5. No-stall + defect ledger
 
-**The rule:** a mission **never blocks waiting on a human.** It always delivers the best
-artifact achievable within caps, with **every known shortfall recorded in the defect
-ledger.**
-
-- This governs **termination behavior, not quality tolerance.** The quality bar never
-  moves. What changes is that failing to reach it produces an *annotated artifact*, not a
-  stall. "Every defect must be confessed in writing" — not "lousy is acceptable."
-- The defect ledger is the morning iteration's input and the evolution loop's evidence.
-- **Time is not a cap.** Missions are not killed on a clock. They are finalized on **lack
-  of progress** (§6, finalization).
+A mission **never blocks waiting on a human**: it delivers the best artifact achievable
+within caps, with **every known shortfall confessed in the defect ledger** — the morning
+iteration's input and the evolution loop's evidence. This governs **termination behavior,
+not quality tolerance**: the bar never moves; missing it produces an *annotated artifact*,
+not a stall. **Time is not a cap** — missions die on lack of progress (§6.3), never on a
+clock.
 
 ---
 
@@ -459,14 +451,10 @@ consume it.** The frozen plan is pure data and harness-neutral (§10).
 ```
 GOAL  (one line from the human)
   │
-GRILL   The one human-in-the-loop conversation, right after the goal. Align on
-        intent, scope, constraints, approach; surface and resolve ambiguity up
-        front while the human is present (attended / launched-live: live;
-        queued / remote: criticality-split, §4). Confirm with the human what
-        their final-result verdict will look at — the goal is V3 (§2) and they
-        are its only verifier; the agent must know what "done" looks like to
-        them. The grilled understanding feeds PLAN. After GRILL, everything
-        below runs autonomously.
+GRILL   The one human-in-the-loop conversation (§4), right after the goal:
+        resolve every branch while the human is present, and confirm what
+        their final verdict will look at — the goal is V3 (§2), they are its
+        only verifier. Feeds PLAN; everything below runs autonomously.
   │
 PLAN    Orchestrator reads constitution + repo contract + machine profile +
         (project card, if present) → drafts a DAG. Each node carries: deps,
@@ -496,17 +484,20 @@ EXECUTE Deterministic walk of the DAG (executor adapter, §10):
         Problem-solving ladder per §6.1.
   │
 AUDIT   Whole-deliverable review against the plan's own acceptance criteria +
-        constitution (not vibes). Re-run all recorded checks; judge-sample
-        self-closures (§2.1). Punchlist items become new DAG nodes → re-enter
-        EXECUTE. Capped (§6.2), then defect ledger + done.
+        constitution (not vibes). Re-run recorded checks; judge-sample
+        self-closures (§2.1). Punchlist: fixed within the capped audit cycles
+        (§6.2) or ledgered for a Human-commissioned follow-up mission — the
+        proven pattern; never silent scope loss.
   │
-DELIVER Artifact + defect ledger + question log + run-record. Report + push
-        (§ reporting).
+DELIVER Artifact + defect ledger + run-record. Report + push (§12).
 ```
 
 ### 6.1 Problem-solving ladder (within EXECUTE)
 
-When a task does not pass, escalate through tiers — do not jump:
+Rung 0, before any climbing: **verify the loop** — confirm the check actually observes the
+change (fresh build, right path, the artifact that ships). Retries against a disconnected
+oracle read as progress and are pure waste. Then, when a task does not pass, escalate
+through tiers — do not jump:
 
 | Tier | Mechanism | Use when |
 |---|---|---|
@@ -515,7 +506,10 @@ When a task does not pass, escalate through tiers — do not jump:
 | **Subtree replan** | Node returns "plan assumption false" → orchestrator redraws that branch. | The node's *acceptance criteria themselves* are wrong; no amount of retry fixes a wrong plan. |
 
 Exhausted all three → escalate per interaction mode (§4). Do not replan what a retry would
-fix; do not retry what only a replan can fix.
+fix; do not retry what only a replan can fix. And never resolve a mismatch by quietly
+narrowing the criterion: an AC unmeetable as written is `plan_assumption_false` — a replan
+trigger — or an accepted-major with the narrowing stated in writing. **Goal erosion is
+severity inflation's quiet twin; the gate polices both.**
 
 ### 6.2 Caps
 
@@ -575,8 +569,7 @@ same order** at the top of every spawn's prompt — so every agent after the fir
 prompt cache instead of paying fresh input. Node-specific material (contract, pushed evidence)
 follows the shared prefix. Actors close with structured evidence (diff, files touched, check
 transcripts) that is **pushed into** the reviewer's prompt; a reviewer's own repo access is the
-bounded R2 spot-check budget (§3.1), not open-ended exploration. R0 takes this to the limit —
-the review turn rides the actor's already-cached transcript.
+bounded R2 spot-check budget (§3.1), not open-ended exploration.
 
 **The mission budget (dual estimate, frozen at PLAN — amended v0.4.2).** Each M1/M2 plan
 carries a `token_budget` (executor-observable output tokens) and an `agent_budget` (total
@@ -615,12 +608,10 @@ completion; estimate-vs-actual feeds calibration (§7).
 diffs the actor's touched files against the declaration (deterministic, no model call, §1.3) and
 records any out-of-set write to the defect ledger as a **minor** finding with the full
 declared-vs-touched evidence. It does **not** gate the node and does not escalate to the Human.
-Rationale: until worktree fan-out for mutating nodes is wired, the executor runs them serially
-(§6.5 above), so the parallel-safety derivation the write-set declaration was protecting is not
-yet load-bearing — and the corpus showed every breach to date being a benign in-zone widening,
-making the human-waive step a rubber stamp on a determination the machine already settled. The
-silent-accept ban is preserved by the defect-ledger entry (the breach is recorded with evidence,
-not erased). **When worktree-isolated parallel fan-out for mutating nodes lands, this rule
+Rationale: under serial-only execution the parallel-safety derivation is not yet load-bearing,
+and every observed breach was a benign in-zone widening — the human-waive step had become a
+rubber stamp. The silent-accept ban survives in the defect-ledger entry (recorded with
+evidence, not erased). **When worktree-isolated parallel fan-out for mutating nodes lands, this rule
 re-tightens to a machine-evidence blocker** — parallelism is what makes a write-set breach a real
 safety hazard, and the gate returns with the safety it protects.
 
@@ -746,7 +737,7 @@ a proposal touching them is flagged `PERIMETER` and waits for the Human directly
 
 ---
 
-## 10. Substrate neutrality (forked for Codex)
+## 10. Substrate neutrality
 
 The **specification** (this constitution, the repo contract, the `plan.json` schema) is
 harness-neutral and is the portable **skeleton** — a synthesis of ideas largely already in
@@ -772,32 +763,30 @@ a swappable runtime binding.
 ## 11. Auto-resume (contingency, not interface)
 
 The 5-hour usage window (and crashes, reboots, power loss) must not kill an overnight
-mission. Mechanism: an **orchestrator-armed heartbeat**, not a standing job.
+mission. Mechanism: an **armed heartbeat** — a watchdog, not a pilot. Field record to date:
+autonomous resumes have produced mission progress in **zero** observed cases; every
+interrupted mission was finished by a human-driven session. The heartbeat's honest job is
+therefore **detect death fast, escalate once and loudly, make relaunch one tap**;
+autonomous re-dispatch is a capability each beat *attempts*, never one the mission
+*relies on*.
 
-- The orchestrator **arms** a scheduled task at mission start (must be at launch — a
-  token-dead session cannot schedule its own resurrection) and **disarms** it at mission
-  end.
-- Each beat is **idempotent**: active run → exit; interrupted marker → resume from committed
-  state; complete/absent marker → disarm + exit.
-- **Resume is recovery plumbing, and recovery is uncounted.** A mission spanning N usage
-  windows legitimately resumes N times. The invariant is: **a stale heartbeat survives at
-  most one *futile* firing** — a resume that produced no new mission activity is dead, and
-  the next beat disarms + leaves a `heartbeat.dead` marker (a §12 alarm), never re-fires it.
-  Work thoroughness (actor–critic rounds, ladder, caps) is the executor's job (§6.2); cost
-  is the mission budget's job (§6.4); the heartbeat carries **no** work-quality semantics. A
-  large hard stop in the script is runaway insurance against a fooled progress detector, not
-  a policy knob.
-- **The resumed session carries a per-invocation Workflow grant** (`--allowedTools
-  "Workflow"` on the heartbeat's `claude` command line) so it can re-dispatch the executor on
-  the frozen plan — without it, headless resume can re-orient but never relaunch, and §11's
-  promise is empty. The grant is scoped to the single invocation and dies with it; it is
-  **not** a standing `settings.json` change. The human authorizes it at launch: arming the
-  heartbeat is part of the mission launch they approve. The mission must never widen this
-  grant (§9.1).
-- This absorbs *every* death mode with one mechanism and no clock arithmetic. The limit
-  kills a run; the next beat resumes it after the window resets.
-- The heartbeat is **plumbing, not a user surface.** `/mission` exposes only the goal and
-  the mode.
+- **The Human arms** the scheduled task at launch (the permission classifier denies
+  agent-side `schtasks`; arming is part of the launch they approve — and it must be at
+  launch: a token-dead session cannot schedule its own resurrection). The orchestrator
+  **disarms at DELIVER, and disarm is verified** — a beat that fires after a claimed
+  self-disarm is itself a §12 alarm, and the same death is never escalated twice.
+- Each beat is **idempotent**: active run → exit; interrupted marker → attempt resume from
+  committed state; complete/absent marker → disarm + exit.
+- **Resume is recovery plumbing, and recovery is uncounted** — a mission spanning N windows
+  legitimately resumes N times. The invariant: **a stale heartbeat survives at most one
+  *futile* firing** — a resume that produced no new mission activity leaves `heartbeat.dead`
+  (a §12 alarm) plus a **prepared relaunch command** in the run dir, then stops. The
+  heartbeat carries no work-quality semantics (that is §6.2's job) and no cost semantics
+  (§6.4's); the hard stop in the script is runaway insurance, not a policy knob.
+- **A heartbeat-resumed session carries a per-invocation Workflow grant** (`--allowedTools
+  "Workflow"`), scoped to that single invocation, authorized by the Human at launch — never
+  a standing `settings.json` change, and the mission never widens it (§9.1).
+- The heartbeat is **plumbing, not a user surface.** `/mission` exposes only goal and mode.
 
 ---
 
@@ -849,12 +838,13 @@ Four unambiguous morning signals, so silence is never confused with progress:
   auditable, and **every 5th mission ships the unfiltered ledger** so the filter — the one
   place the framework chooses what the Human sees of its own judgment — is itself audited.
   This is how the Human calibrates each role's behavior without reading a transcript.
-- **The run-record is a DELIVER step, not a courtesy.** Every mission — including re-scoped,
-  lean-pivoted, or human-interrupted ones — writes `mission_records/<run-id>.json` (record
-  schema v0.3) and validates it deterministically (`scripts/validate_record.py`) before the
-  report goes out; `report.json` validates against `mission-report.schema.json` the same way.
-  A mission that skips its record starves the §7 gold signal — two of the first four v0.3.1
-  runs did exactly this, and the human verdicts had nowhere to land.
+- **DELIVER closes like a V1 node — on a closure record of its own.** Every mission —
+  including re-scoped, pivoted, or interrupted ones — writes `mission_records/<run-id>.json`
+  and `report.json`, binds `scripts/validate_record.py` as the check on **both**, and
+  records the passing runs (§2.1); the `constitution_version`-stamped cap-log line is part
+  of the same close. A failed or skipped validation ships as a **top-of-report alarm
+  line**, never silently — an unrecorded mission starves the §7 gold signal, the loop's
+  commonest observed erosion.
 - Reports + records flow to **fieldnotes** (telemetry); this constitution + contracts +
   skills live in **claude-config** (governance). Don't mix the two.
 

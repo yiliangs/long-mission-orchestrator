@@ -3,6 +3,46 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.5.0] — 2026-07-03
+
+Transcript-grounded amendment batch: three evidence readers swept all 19 run-records, 18
+run dirs, the full heartbeat log, and 16 session long-logs; every change cites its runs.
+Net size: the constitution **shrank 564 bytes** (58,005 → 57,441) — additions paid for by
+cuts. Rule changes: comparability partitions at 0.5.0.
+
+### Changed
+- **§11 heartbeat demoted from pilot to watchdog.** Field record: 0/5 autonomous resumes
+  produced mission progress; the same death escalated ~34 times over 21.5h
+  (2026-07-02-salary-atlas); beats fired after claimed self-disarm. New job: detect death
+  fast, escalate once, leave a prepared one-tap relaunch command; the Human arms (the
+  classifier denies agent-side `schtasks`); disarm is verified; the "absorbs every death
+  mode" claim is removed as unearned.
+- **§12 DELIVER closes like a V1 node** — `validate_record.py` bound as the check on both
+  record and report, the stamped cap-log line part of the same close, failure ships as a
+  top-of-report alarm. (Evidence: 3 schema-invalid records, 4 run dirs with no REPORT.md,
+  the one budget-DIVERGED run absent from the cap log.)
+- **§6.1 rung 0: verify the loop** — the check must observe the artifact that ships
+  (tier012 `/tmp` false green; thumbnailbar's five smoke rounds against a stale binary);
+  mirrored into the §2.1 closure-record binding and the operating card.
+- **§6.1 anti-goal-erosion clause** — an AC unmeetable as written is
+  `plan_assumption_false` or a written accepted-major narrowing, never a quiet reword.
+  (4 runs closed ACs on narrowed readings; 13 accepted-majors in salary-atlas; zero
+  `plan_assumption_false` ever emitted across 18 runs.)
+- **§2.4 M-class honesty** — the script guards the M0/M1 floor; judgment supplies M2
+  (0/6 observed M2 classifications came from the script gate).
+- **§6 matched to observed reality** — punchlist: capped audit cycles or a
+  Human-commissioned follow-up mission (the proven pattern); the question log struck from
+  DELIVER (0/18 runs produced one; nothing consumed it).
+- **§3.2 evidence defined** — diff, committed artifact, or check transcript; narrative
+  prose alone is not evidence (3 runs closed on prose-only evidence); mirrored to card.
+
+### Tightened (paying for the additions)
+- §1.5 perimeter shadow-list reduced to category names + §9.1 pointer (single source).
+- §5 compressed to one paragraph; §6 GRILL block reduced to a §4 pointer; §3.4
+  token-discipline and §3.5 provenance paragraphs compressed; §6.4 duplicate R0 line cut;
+  §6.5 rationale compressed; §3.6 round-up paragraph collapsed to a §2.2 citation; §10
+  heading de-forked.
+
 ## [0.4.4] — 2026-07-03
 
 Second `/prune` pass, this time on the constitution itself. Non-normative text only — no
