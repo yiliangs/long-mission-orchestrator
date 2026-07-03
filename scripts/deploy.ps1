@@ -46,6 +46,6 @@ Copy-Item "$repo\channel\lmo.json"               "$claude\channel\apps.d\lmo.jso
 
 Write-Host "Deployed long-mission-orchestrator -> $claude"
 Write-Host "  docs/      agent-constitution, schemas, codex adapter"
-Write-Host "  commands/  /mission /mission-log-audit  (evolve demoted to docs/ at 0.3.4)"
+Write-Host "  commands/  /mission /mission-loop /mission-log-audit  (evolve demoted to docs/ at 0.3.4)"
 Write-Host "  workflows/ mission-executor.workflow.js"
 Write-Host "  scripts/   classify-mission, mailbridge + mission_mailbox (email channel)"
