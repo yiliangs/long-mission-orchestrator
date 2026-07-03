@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.4.2
+**Version:** 0.4.3
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -562,7 +562,7 @@ the gate.
 *orchestrator's* rulebook. An actor or critic needs only the handful of rules that bind its
 single step — the V-classes, the closure-record shape (§2.1), the §9.1 perimeter, and
 citation-gated blockers (§3.3). Workers are therefore handed a distilled **operating card**
-(`~/.claude/docs/operating-card.md`, ~1–2 KB) rather than the full ~26 KB constitution. This
+(`~/.claude/docs/operating-card.md`, ~5 KB) rather than the full ~57 KB constitution. This
 preserves the fresh-context property (§1.4) — fresh context means *re-derived state, not
 re-read governance* — while cutting the per-spawn governance tax several-fold. The orchestrator
 alone loads the full constitution; the army carries the card.

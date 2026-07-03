@@ -162,7 +162,7 @@ per finding, you (orchestrator) rule. Blockers must cite. Do **not** loop to con
 **Provision each critic frugally (§6.4 cost) — FIGHT critics are spawned by you, the
 orchestrator, so the operating-card discipline the executor applies does NOT reach them
 automatically; apply it here by hand.** Hand each critic the **operating card**
-(`~/.claude/docs/operating-card.md`), *not* the 36 KB constitution. Pin the artifacts to read —
+(`~/.claude/docs/operating-card.md`), *not* the ~57 KB constitution. Pin the artifacts to read —
 `plan.json` + `brief.md` only — and **bound repo exploration to a spot-check budget**: read only
 the specific paths a node's `write_set`/instruction names, read-only, to test a *specific*
 premise; trust declared paths unless a concrete claim needs checking. Do **not** instruct a
@@ -195,7 +195,10 @@ each be one glance to catch before go.
 **Arm the heartbeat (constitution §11) for M1/M2** — as soon as `.mission/<run-id>/` exists
 at PLAN, **not** here at freeze: §11 requires arming at launch, because a session that dies
 grilling or fighting cannot schedule its own resurrection (the natalie-fable-revision run died
-exactly there — usage limit mid-PLAN, no heartbeat armed, recovery was manual). Arm with:
+exactly there — usage limit mid-PLAN, no heartbeat armed, recovery was manual). **Arming is a
+Human action** — the permission classifier denies agent-side `schtasks` (the same fact
+`/mission-loop` §Driver records), so hand the Human the arm command at launch rather than
+running it yourself:
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/scripts/mission_heartbeat.ps1 arm -RunDir <repo>/.mission/<run-id>

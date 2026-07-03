@@ -45,7 +45,7 @@ overnight firings). The 0.3.1 point release adds compute tier as the third froze
 |---|---|---|
 | **Review tiers (R0–R3, §3.1)** | review depth becomes a per-node dial beside V-class; V→R floors bind (V0/V1 ⇒ R0 ok, V2/outward ⇒ ≥R2, final ⇒ R3), with per-node escape-rate telemetry | size review to stake, validate cheap tiers on evidence |
 | **Compute tier (§3.6)** | per-node `model_tier` frozen in `plan.json`; every gate is always Opus, descent-eligible actors floor at Sonnet, Haiku opt-in only | the strongest model lands on stake, savings land off the gates |
-| **Mission budget (§6.4)** | dual ceiling in `plan.json` — `token_budget` + `agent_budget`; exhaustion is a *divergence*, never a mid-node kill or skipped gate | bound fan-out cost without breaking the verification floor |
+| **Mission budget (§6.4)** | dual ceiling in `plan.json` — `token_budget` + `agent_budget`; exhaustion was a *divergence*, never a mid-node kill or skipped gate — **superseded in v0.4.2**: an overrun never halts at all; the run continues and the overrun is marked in the results | bound fan-out cost without breaking the verification floor |
 | **Canonical context pack (§6.4)** | byte-identical shared prefix on every spawn so agents hit the prompt cache; actors return pushed evidence (raw diff) critics judge from | kill the "every spawn re-reads from the start" cost shape |
 | **Futility-only resume (§11)** | recovery resumes are *uncounted*; the invariant is "survive at most one *futile* firing," with a `RunawayStop=20` hard brake as insurance | a legit multi-window mission resumes freely; a stalled one dies fast |
 | **Per-invocation Workflow grant (§11)** | the heartbeat's headless `claude --resume` carries `--allowedTools "Workflow"`, scoped to one invocation | resumed missions can actually re-dispatch; no standing grant |
@@ -116,7 +116,7 @@ severity *down* to "major" (protect the human's attention).
 long-mission-orchestrator/
 ├── docs/
 │   ├── agent-constitution.md       # THE rules — read first
-│   ├── operating-card.md           # the ~1.5 KB worker brief
+│   ├── operating-card.md           # the ~5 KB worker brief
 │   ├── evolution.md                # how it improves itself
 │   └── evolve.md                   # evolution procedure (internal; demoted from /evolve at 0.3.4)
 ├── schema/                         # plan.json, run-record, cap-log formats
@@ -154,7 +154,7 @@ Copies the constitution, operating card, and schemas into `~/.claude/docs/`, ski
 
 ---
 
-## Status (v0.3.x, post-daylight)
+## Status (v0.4.x, post-daylight)
 
 **Missions have run.** As of 2026-06-12 the fieldnotes corpus holds 8 schema-validated
 run-records: one v0.1 daylight mission (natalie `block-hygiene-20260608`, 17 agents, DELIVERED,

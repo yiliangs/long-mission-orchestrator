@@ -3,6 +3,33 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.4.3] — 2026-07-03
+
+Doc-hygiene release from a `/prune` audit of the whole doc tree. Clarifications only — no
+rule changes; non-comparability-breaking per evolution.md's amendment split, so records may
+aggregate with 0.4.2.
+
+### Changed
+- **§6.4 size claims corrected**: operating card ~1–2 KB → ~5 KB (actual 4.8 KB);
+  constitution ~26 KB → ~57 KB (actual 58 KB). Descriptive only.
+- **`schema/cap-log.format.md` rewritten to match the real feed**: one line per mission at
+  DELIVER (was: one line per node-cap-hit), `cap_hits[]` entries carrying
+  `would_have_converged`, `<cap>_used`/`<cap>_cap` pairs, budget planned-vs-actual; cap enum
+  extended with `gate_fix_cycles`, `token_budget`, `agent_budget` (the corpus already uses
+  them); legacy line heterogeneity documented; append-only preserved.
+- **Tier-2 thresholds single-sourced**: `docs/evolve.md` now cites cap-log.format.md instead
+  of restating the raise/lower numbers; `docs/evolution.md` §Triggering deduplicated to
+  diagram + pointer (evolve.md is the procedure authority).
+- **Stale refs fixed across the tree**: README status v0.3.x → v0.4.x and the superseded
+  0.4.2 budget row annotated; `/evolve apply` → email GRANT router in `proposals/README.md`;
+  `skills/mission.md` heartbeat arming corrected to a Human action (the permission classifier
+  denies agent-side `schtasks`); stale constitution-size figures in `skills/mission.md`;
+  drifted `mission_heartbeat.ps1` line cites in `skills/mission-loop.md` replaced with stable
+  function/marker anchors.
+- **Deferred (flagged, not changed)**: §3.6 hard-codes "Opus" as the top tier while the
+  principle says "strongest model" — to be amended at the next capability re-baseline
+  (evolve.md already anticipates Opus→Fable).
+
 ## [0.4.2] — 2026-07-03
 
 Budget-overrun release, born from §7 post-session intake: the 2026-07-02-salary-atlas M2 run
