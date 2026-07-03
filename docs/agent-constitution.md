@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.4.1
+**Version:** 0.4.2
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -543,9 +543,10 @@ distinguishes:
 | **Late** | ETA slips, remaining work monotonically shrinking. | Continue. Log it. The plane lands when it lands. |
 | **Diverging** | Remaining work not shrinking over a window: punchlist growing faster than fixes, recurring replans, a node cycling. | Finalize gracefully: audit what exists, ledger, status report. |
 
-A mission is killed on **divergence**, never on the clock. **Budget exhaustion (§6.4) is a
-divergence, not a deadline:** the executor stops opening new nodes, lets in-flight nodes
-close, audits what exists, and reports `DIVERGED(budget)` — never a mid-node kill.
+A mission is killed on **divergence**, never on the clock. **A budget overrun (§6.4) is NOT a
+divergence** (amended v0.4.2): crossing a budget never halts the mission — the executor keeps
+running and the overrun is recorded and marked in the final results. Divergence remains a
+lack-of-progress verdict only.
 
 ### 6.4 Cost
 
@@ -577,19 +578,22 @@ transcripts) that is **pushed into** the reviewer's prompt; a reviewer's own rep
 bounded R2 spot-check budget (§3.1), not open-ended exploration. R0 takes this to the limit —
 the review turn rides the actor's already-cached transcript.
 
-**The mission budget (dual ceiling, frozen at PLAN).** Each M1/M2 plan carries a
-`token_budget` (executor-observable output tokens) and an `agent_budget` (total spawns) —
-proposed per mission class at PLAN, shown at the FREEZE go-gate, recorded planned-vs-actual in
-the run-record. Both are honest **proxies**: the true drain (cumulative cache-reads across the
-fan-out) is not observable mid-run, so the token ceiling catches generation-heavy runaways
-while the agent ceiling bounds fan-out multiplication — and §7 telemetry calibrates the class
-defaults from actuals. Exhausting either ceiling is a **divergence** (§6.3): finalize
-gracefully, never kill mid-node. A budget can narrow scope; it can **never** skip a gate or
-lower a floor — a run that cannot afford its own verification narrows scope (above), it does
-not verify less. A ceiling crossed **mid-wave** (in-flight nodes completing per §6.3) is
-sanctioned but never silent: the executor records it as a mission-level `cap_hit`
-(`token_budget` / `agent_budget`) in the run-record — a breach that exists only as report
-prose is invisible to §7 calibration.
+**The mission budget (dual estimate, frozen at PLAN — amended v0.4.2).** Each M1/M2 plan
+carries a `token_budget` (executor-observable output tokens) and an `agent_budget` (total
+spawns) — proposed per mission class at PLAN, shown at the FREEZE go-gate, recorded
+planned-vs-actual in the run-record. Both are honest **proxies**: the true drain (cumulative
+cache-reads across the fan-out) is not observable mid-run — and §7 telemetry calibrates the
+class defaults from actuals. **The budget is an estimate and a reporting tripwire, not a
+kill-switch: if the run overruns the estimate, it keeps running.** No node-opening stops, no
+quality-pass shedding, never a mid-node kill — the overrun is **marked in the final results**:
+a mission-level `cap_hit` (`token_budget` / `agent_budget`) plus an explicit `budget.overrun`
+in the run-record, a prominent overrun line in the report, and a decision-ledger row (a breach
+that exists only as report prose is invisible to §7 calibration). Runaway protection is §6.3's
+progress-based divergence plus the harness's absolute spawn cap — not this number. A budget
+still **never** skips a gate or lowers a floor, and it is never an excuse to verify less.
+(Provenance, per §7 post-session intake: the 2026-07-02-salary-atlas run halted at its 2M
+ceiling with the deliverable tail unopened, costing a human round-trip to grant more; the
+Human directed continue-and-mark, 2026-07-03.)
 
 ### 6.5 Parallelism by blast radius
 

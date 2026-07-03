@@ -116,9 +116,11 @@ down-sample). When the call is blurry, leave it absent and let the floor round y
 **Propose the mission budget (§6.4).** For M1/M2, set mission-level `token_budget`
 (executor-observable output tokens) and `agent_budget` (total spawns) — start from class
 defaults (M1: 200K/12; M2: 800K/40) adjusted for plan size, and record the reasoning in one
-line. These freeze with the plan, surface at the go-gate, and exhaustion finalizes the
-mission as `DIVERGED(budget)` (§6.3) — they are proxies the run-record calibrates over time,
-not quality levers: a budget narrows scope, it never skips a gate.
+line. These freeze with the plan and surface at the go-gate. **They are estimates, not
+kill-switches (§6.4 v0.4.2): an overrun never halts the mission — the run keeps going and the
+overrun is marked in the final results** (mission-level `cap_hit` + `budget.overrun` + a
+prominent report line + decision-ledger row). They are proxies the run-record calibrates over
+time, not quality levers: a budget never skips a gate or sheds a quality pass.
 
 **Then classify the mission (§2.4) — by the deterministic classifier, NOT by reasoning.** Write
 the drafted DAG to a `plan.json` and run
@@ -228,10 +230,11 @@ review-gate each node at its frozen **R-tier** (§3.1 — R0 two-phase self-audi
 diff, R2 cold-eye + spot-check, R3 panel), climb the problem-solving ladder (§6.1),
 subtree-replan on "plan assumption false". Honor caps (§6.2) and the **mission budget**
 (§6.4): every spawn shares the canonical context pack (byte-identical prefix → cache hits),
-evidence is pushed to reviewers rather than re-explored, and exhausting `token_budget` or
-`agent_budget` finalizes as `DIVERGED(budget)` — no new nodes, in-flight nodes close, never a
-mid-node kill. Bind and record closure records for V0/V1 (§2.1). Finalize on divergence,
-never on a clock (§6.3).
+evidence is pushed to reviewers rather than re-explored, and overrunning `token_budget` or
+`agent_budget` **never halts the run (v0.4.2)** — the walk continues and the overrun is marked
+in the final results (cap_hit + budget.overrun + report line). Bind and record closure records
+for V0/V1 (§2.1). Finalize on divergence — lack of progress — never on a clock or a budget
+(§6.3).
 
 ### 6. AUDIT → DELIVER
 Whole-deliverable review against the plan's own acceptance criteria + constitution. **Depth

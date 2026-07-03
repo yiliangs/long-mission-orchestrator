@@ -3,6 +3,32 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.4.2] — 2026-07-03
+
+Budget-overrun release, born from §7 post-session intake: the 2026-07-02-salary-atlas M2 run
+halted at its 2M token ceiling with 14/20 nodes done and the entire deliverable tail (blend,
+fact-checks, explorer, QA, assembly) unopened — a DIVERGED(budget) that cost a human
+round-trip solely to grant more budget. Human directive: "If budget is over estimation, keep
+running, just mark the budget overrun into final results."
+
+### Changed
+- **§6.4 budget semantics: continue-and-mark, never halt.** The mission budget
+  (`token_budget` / `agent_budget`) is an **estimate and reporting tripwire, not a
+  kill-switch**. Overrunning it never stops node-opening, never sheds quality passes
+  (improver, gate-fix cycles), never truncates a gate. The overrun is marked in the final
+  results: mission-level `cap_hit`, explicit `budget.overrun` in the run-record, a prominent
+  report line, and a decision-ledger row. Runaway protection is §6.3 progress-based
+  divergence plus the harness's absolute spawn cap.
+- **§6.3:** budget exhaustion removed from the divergence definition — divergence is a
+  lack-of-progress verdict only.
+- **Executor (`executors/mission-executor.workflow.js`):** wave-granularity budget halt
+  replaced with a one-time overrun log; budget guards removed from the improver and gate-fix
+  loops; verdict no longer keys off budget state; `budget.overrun` + `overrun_policy` added
+  to the budget report. (Line endings normalized CRLF→LF — required by the Workflow
+  permission layer.)
+- **`schema/mission-plan.schema.json`** `token_budget` / `agent_budget` descriptions and
+  **`skills/mission.md`** PLAN/EXECUTE budget language aligned.
+
 ## [0.4.1] — 2026-06-28
 
 Coverage-honesty release. Closes the gap a `/mission-log-audit` diagnosis surfaced: a machine

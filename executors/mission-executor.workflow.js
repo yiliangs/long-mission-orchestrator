@@ -91,29 +91,32 @@ const DEFAULT_CAPS = {
   gate_fix_cycles: 2,       // §6.1 tier 2: capped revise→re-review→re-adjudicate at the gate (≤2)
 }
 
-// ── Mission budget (§6.4): dual ceiling frozen at PLAN ───────────────────────
+// ── Mission budget (§6.4, v0.4.2 semantics): dual ESTIMATE frozen at PLAN ────
 // budget.spent() counts OUTPUT tokens across the turn — an honest proxy; the cumulative
-// cache-read drain is not observable mid-run, which is exactly why the agent ceiling exists:
-// it bounds the fan-out multiplication the token meter cannot see. Exhausting either is a
-// DIVERGENCE (§6.3): no new nodes, in-flight nodes close, AUDIT still runs. Never a mid-node
-// kill, and never a reason to skip a gate or lower a floor.
+// cache-read drain is not observable mid-run. AMENDED per human directive (2026-07-03, after
+// the salary-atlas run diverged at 2M with the deliverable tail unopened): the budget is an
+// ESTIMATE and a reporting tripwire, NOT a kill-switch. An overrun never halts the mission
+// and never sheds quality passes — the run keeps going and the overrun is MARKED in the final
+// results (mission-level cap_hit + budget.overrun + a report line). Runaway protection is
+// §6.3 progress-based divergence plus the harness's absolute agent cap, not this number.
+// A budget still never skips a gate or lowers a floor.
 const TOKEN_BUDGET = plan.token_budget || null
 const AGENT_BUDGET = plan.agent_budget || null
 const _startSpent = budget.spent()
 let _agentsSpawned = 0
 function tokensUsed() { return budget.spent() - _startSpent }
-function budgetExhausted() {
+function budgetOverrun() {
   return (TOKEN_BUDGET != null && tokensUsed() >= TOKEN_BUDGET) ||
          (AGENT_BUDGET != null && _agentsSpawned >= AGENT_BUDGET)
 }
 // Every spawn goes through here so planned-vs-actual lands in the run-record (§7).
-// A mid-wave ceiling crossing is sanctioned (§6.4: in-flight work completes) but NEVER silent:
-// it is logged here and recorded as a mission-level cap_hit in budgetReport() — the first
-// daylight overrun (38/36) reached the report only as prose, invisible to §7 calibration.
+// An overrun is sanctioned (§6.4 v0.4.2: the run continues) but NEVER silent: logged here and
+// recorded as a mission-level cap_hit in budgetReport() — a breach that exists only as prose
+// is invisible to §7 calibration.
 function spawn(prompt, opts) {
   _agentsSpawned++
   if (AGENT_BUDGET != null && _agentsSpawned === AGENT_BUDGET + 1)
-    log(`⚠ Agent ceiling crossed mid-wave (${_agentsSpawned}/${AGENT_BUDGET}) — in-flight work completes (§6.4); overrun lands in cap_hits.`)
+    log(`⚠ Agent estimate overrun (${_agentsSpawned}/${AGENT_BUDGET}) — run continues (§6.4 v0.4.2); overrun lands in cap_hits + final report.`)
   return agent(prompt, opts)
 }
 
@@ -518,8 +521,8 @@ async function runNode(node) {
   // improve or no-op — a botched/failed revision is discarded, so a node never regresses.
   const eligibleForImprover = node.ac_required && !node.is_final_deliverable
   const improverOn = eligibleForImprover && MCLASS !== 'M0' &&
-    (MCLASS === 'M2' ? node.improve_pass !== false : node.improve_pass === true) &&
-    !budgetExhausted()   // advisory pass, first thing shed under budget pressure (§6.4)
+    (MCLASS === 'M2' ? node.improve_pass !== false : node.improve_pass === true)
+    // v0.4.2: no budget-pressure shedding — an overrun is marked, never traded against quality.
   if (actor.outcome === 'done' && improverOn) {
     // Improver is advisory and backstopped by the gate that follows it (§3.6) → Sonnet floor.
     const improver = await spawn(improverPrompt(node, actor.artifact_summary),
@@ -587,7 +590,7 @@ async function runNode(node) {
   const _gfEntryBlockers = verdict.blockers.length, _gfEntryMajors = verdict.majors.length
   let _fixCycles = 0, _gfAdopted = 0
   while ((verdict.blockers.length > 0 || verdict.majors.length > 0) &&
-         _fixCycles < _gateFixCap && !budgetExhausted()) {
+         _fixCycles < _gateFixCap) {   // v0.4.2: fix cycles run to their own cap; budget overrun never truncates the gate
     _fixCycles++
     const _priorFindings = [...verdict.blockers, ...verdict.majors, ...verdict.minors]
     const revised = await spawn(reviseActorPrompt(node, _priorFindings),
@@ -614,7 +617,7 @@ async function runNode(node) {
   // any, is carried so the human/AUDIT sees the unapplied remedy. The gate itself is unchanged.
   const _majorAcceptReason = (f) =>
     `accepted-with-reason: gate-fix loop ran ${_fixCycles}/${_gateFixCap} cycle(s)` +
-    `${budgetExhausted() ? ' (budget exhausted)' : ''} and this major survived; ` +
+    ` and this major survived; ` +
     `${f.suggested_fix ? `unapplied suggested_fix: ${f.suggested_fix}` : 'no actor-suggested fix on record'}.`
   for (const _m of verdict.majors) if (_m.reason == null) _m.reason = _majorAcceptReason(_m)
 
@@ -630,7 +633,6 @@ async function runNode(node) {
     blockers_resolved: Math.max(0, _gfEntryBlockers - verdict.blockers.length),
     majors_resolved: Math.max(0, _gfEntryMajors - verdict.majors.length),
     terminal: (verdict.blockers.length === 0 && verdict.majors.length === 0) ? 'clean'
-      : budgetExhausted() ? 'budget_exhausted'
       : _fixCycles >= _gateFixCap ? 'cap_exhausted'
       : 'no_progress',
   } : null
@@ -676,17 +678,16 @@ const doneSet = new Set(Object.keys(completed))
 const results = { ...completed }
 let nodes = plan.nodes.slice()
 let replanBudget = (DEFAULT_CAPS.subtree_replans * 2) // mission-level ceiling (§6.2: 3/mission; kept conservative)
-let budgetDiverged = false
+let _overrunLogged = false
 
 while (doneSet.size < nodes.length) {
-  // Budget gate (§6.4) at WAVE granularity: exhaustion stops opening new nodes; whatever is
-  // mid-wave completes (never a mid-node kill). AUDIT still runs on what exists.
-  if (budgetExhausted()) {
-    budgetDiverged = true
-    log(`Mission budget exhausted (${tokensUsed()} output tok / ${_agentsSpawned} agents vs ` +
-      `${TOKEN_BUDGET || '∞'}/${AGENT_BUDGET || '∞'}) — DIVERGED(budget) per §6.3. ` +
-      `${nodes.length - doneSet.size} node(s) unopened → defect ledger. Finalizing.`)
-    break
+  // Budget tripwire (§6.4 v0.4.2) at WAVE granularity: an overrun NEVER stops the walk — it is
+  // logged once here, recorded as a mission-level cap_hit, and marked in the final results.
+  if (budgetOverrun() && !_overrunLogged) {
+    _overrunLogged = true
+    log(`⚠ Mission budget estimate overrun (${tokensUsed()} output tok / ${_agentsSpawned} agents vs ` +
+      `estimate ${TOKEN_BUDGET || '∞'}/${AGENT_BUDGET || '∞'}) — run CONTINUES per §6.4 v0.4.2; ` +
+      `overrun marked in cap_hits + final report. ${nodes.length - doneSet.size} node(s) still to open.`)
   }
   const ready = nodes.filter(n => !doneSet.has(n.id) && isReady(n, doneSet))
   if (ready.length === 0) {
@@ -747,7 +748,9 @@ function budgetReport() {
   return {
     token_budget: TOKEN_BUDGET, agent_budget: AGENT_BUDGET,
     tokens_spent: tokensUsed(), agents_spawned: _agentsSpawned,
-    exhausted: budgetDiverged,
+    exhausted: budgetOverrun(),        // estimate crossed — informational, never a halt (v0.4.2)
+    overrun: budgetOverrun(),          // explicit v0.4.2 marker: run continued past the estimate
+    overrun_policy: 'continue-and-mark (§6.4 v0.4.2)',
     cap_hits,
     unopened_nodes: nodes.filter(n => !doneSet.has(n.id)).map(n => n.id),
   }
@@ -764,8 +767,8 @@ if (MCLASS === 'M0') {
   return {
     run_id: plan.run_id,
     mission_class: MCLASS,
-    verdict: (blockers.length === 0 && !failed && !budgetDiverged) ? 'DELIVERED' : 'DIVERGED',
-    diverged_reason: budgetDiverged ? 'budget' : null,
+    verdict: (blockers.length === 0 && !failed) ? 'DELIVERED' : 'DIVERGED',
+    diverged_reason: (blockers.length === 0 && !failed) ? null : 'node_failure',
     unresolved_blockers: blockers,
     accepted_majors: majors,
     replans: replans.map(r => ({ node: r.node, reason: r.reason })),
@@ -803,7 +806,7 @@ ${auditSummary}
 Unresolved blockers (human-only to waive): ${JSON.stringify(blockers)}
 Open majors (agent accept-with-reason allowed): ${JSON.stringify(majors)}
 Plan-assumption-false nodes: ${JSON.stringify(replans.map(r => ({ node: r.node, reason: r.reason })))}
-${budgetDiverged ? `BUDGET EXHAUSTED mid-mission (§6.4): unopened nodes ${JSON.stringify(budgetReport().unopened_nodes)} — these go to the defect ledger as unreached, and the verdict is DIVERGED.` : ''}
+${budgetOverrun() ? `BUDGET ESTIMATE OVERRUN (§6.4 v0.4.2): the run spent ${tokensUsed()} output tokens / ${_agentsSpawned} agents against the estimate ${TOKEN_BUDGET || 'none'}/${AGENT_BUDGET || 'none'} and CONTINUED per policy. This is NOT a divergence and must NOT drive the verdict — but the overrun MUST be marked prominently in the ledger and report (planned-vs-actual + one decision-ledger line).` : ''}
 
 ${recheckInstruction} Assemble the punchlist (each item is a candidate new node) and the
 defect ledger (majors accepted-with-reason + minors + unreached criteria). Verdict DELIVERED
@@ -814,8 +817,8 @@ unless the mission diverged (§6.3) or an unwaived blocker remains.`,
 return {
   run_id: plan.run_id,
   mission_class: MCLASS,
-  verdict: budgetDiverged ? 'DIVERGED' : (audit ? audit.verdict : 'DIVERGED'),
-  diverged_reason: budgetDiverged ? 'budget' : null,
+  verdict: audit ? audit.verdict : 'DIVERGED',
+  diverged_reason: audit ? (audit.verdict === 'DIVERGED' ? 'no_progress_or_blockers' : null) : 'audit_lost',
   unresolved_blockers: blockers,            // human-only; drive the "Needs you" report section
   accepted_majors: majors,
   replans: replans.map(r => ({ node: r.node, reason: r.reason })),
