@@ -3,6 +3,23 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.4.4] — 2026-07-03
+
+Second `/prune` pass, this time on the constitution itself. Non-normative text only — no
+rule changes; non-comparability-breaking (aggregates with 0.4.2/0.4.3).
+
+### Removed
+- **§6.4** salary-atlas provenance parenthetical — the full story (run, ceiling, human
+  directive) lives in this changelog's 0.4.2 entry; history belongs in the changelog and
+  git, not the governing body (§13's own doctrine).
+- **§12** dead "(v0.1 — expected to evolve)" tag on the report format — the format already
+  evolved in place (plain layer, decision ledger); the tag tracked nothing.
+
+### Changed
+- **§6.2** "Review per a-c task" row compressed to a §3.1 pointer plus its one real number
+  (R2 spot-check ≤5 reads) — the row restated the V→R floors and would silently drift
+  whenever §3.1 moves.
+
 ## [0.4.3] — 2026-07-03
 
 Doc-hygiene release from a `/prune` audit of the whole doc tree. Clarifications only — no

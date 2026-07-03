@@ -1,6 +1,6 @@
 # Agent Constitution
 
-**Version:** 0.4.3
+**Version:** 0.4.4
 **Status:** active
 **Authority:** the Human is sole merge authority and sole amender of perimeter clauses (§9).
 **Scope:** governs every autonomous or semi-autonomous *mission* run by any harness
@@ -530,7 +530,7 @@ plan.json with a reason string.
 | Plan-fight rounds | 3 |
 | Audit → punchlist → fix cycles | 2, then defect ledger |
 | Gate-fix cycles (§3.3) | 2 per node, then surviving blockers file to the Human + majors accept-with-reason |
-| Review per a-c task | R-tier per node (§3.1): R2 default for V2 nodes; R3 panel for final deliverable + plan-fight; R2 spot-check budget ≤5 reads |
+| Review per a-c task | per the §3.1 V→R floors; R2 spot-check budget ≤5 reads |
 | Cold-reviewer swaps (§3.4) | 1, fired only at a candidate-clean terminal on high-stakes nodes |
 
 ### 6.3 Finalization (not a deadline)
@@ -591,9 +591,6 @@ in the run-record, a prominent overrun line in the report, and a decision-ledger
 that exists only as report prose is invisible to §7 calibration). Runaway protection is §6.3's
 progress-based divergence plus the harness's absolute spawn cap — not this number. A budget
 still **never** skips a gate or lowers a floor, and it is never an excuse to verify less.
-(Provenance, per §7 post-session intake: the 2026-07-02-salary-atlas run halted at its 2M
-ceiling with the deliverable tail unopened, costing a human round-trip to grant more; the
-Human directed continue-and-mark, 2026-07-03.)
 
 ### 6.5 Parallelism by blast radius
 
@@ -823,7 +820,7 @@ Four unambiguous morning signals, so silence is never confused with progress:
   configured morning hour, a still-flying mission emits an **IN-FLIGHT(ETA)** status line so
   "late plane" never reads as "crash."
 - **Email** the full `REPORT.md` (reuse the proven plaid-finance channel).
-- **Report format** (v0.1 — expected to evolve): inverted pyramid, one screen. Verdict line
+- **Report format:** inverted pyramid, one screen. Verdict line
   (phone-readable) → *Needs you* (one-tap verdicts, which double as escalation-precision
   telemetry) → *Accepted-with-reason* → *Done*. A `report.json` twin accompanies it for the
   evolution loop.
