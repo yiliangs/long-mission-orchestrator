@@ -70,6 +70,17 @@
               "terminal": { "enum": ["clean", "no_progress", "cap_exhausted", "budget_exhausted"], "description": "Why the loop stopped: clean = all findings resolved; no_progress = a revision failed or made no strict progress; cap_exhausted = hit gate_fix_cycles; budget_exhausted = mission budget stopped it." }
             }
           },
+          "ac_amendment": {
+            "type": ["object", "null"],
+            "description": "§6.1 anti-goal-erosion: actor-proposed AC amendment, recorded at the gate as an accepted-major (never a quiet narrowing). The Human's morning veto surface.",
+            "additionalProperties": false,
+            "properties": {
+              "ac_id": { "type": "string" },
+              "as_written": { "type": "string" },
+              "proposed": { "type": "string" },
+              "why": { "type": "string" }
+            }
+          },
           "note": { "type": "string" }
         }
       }
@@ -260,6 +271,8 @@
         "agent_budget": { "type": "integer" },
         "agents_spawned": { "type": "integer" },
         "exhausted": { "type": "boolean" },
+        "overrun": { "type": "boolean", "description": "v0.4.2 marker: the run crossed the estimate and CONTINUED (continue-and-mark, §6.4)." },
+        "overrun_policy": { "type": "string" },
         "note": { "type": "string", "description": "Planned-vs-actual commentary (e.g. FIGHT estimate accuracy) — a calibration signal for the feasibility lens." }
       }
     },
@@ -283,8 +296,8 @@
 
     "human_review": {
       "type": "object",
-      "description": "Filled by /mission-log-audit when the Human reviews. THE GOLD SIGNAL (§7): the diff between delivered and accepted is ground truth for where the framework misjudged.",
-      "additionalProperties": false,
+      "description": "Filled by /mission-log-audit when the Human reviews. THE GOLD SIGNAL (§7): the diff between delivered and accepted is ground truth for where the framework misjudged. Extension keys are ALLOWED here (additionalProperties true): the gold signal must never be rejected for being richer than the schema — two of the corpus's most human-reviewed records were schema-INVALID for exactly that.",
+      "additionalProperties": true,
       "required": ["reviewed"],
       "properties": {
         "reviewed": { "type": "boolean" },

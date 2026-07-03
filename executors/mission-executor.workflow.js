@@ -187,7 +187,7 @@ const ACTOR_SCHEMA = {
   required: ['outcome', 'artifact_summary'],
   additionalProperties: false,
   properties: {
-    outcome: { enum: ['done', 'plan_assumption_false', 'failed'] },
+    outcome: { enum: ['done', 'plan_assumption_false', 'ac_amendment_proposed', 'failed'] },
     artifact_summary: { type: 'string' },
     // Pushed evidence (§6.4 context discipline): reviewers judge from this, not from
     // re-exploring the repo. The raw diff is what an R1/R2 critic reads in full.
@@ -201,6 +201,7 @@ const ACTOR_SCHEMA = {
         check_source: { enum: ['registry', 'ad-hoc'], description: 'registry = named in the repo contract verifier registry; ad-hoc = composed for this node. Ad-hoc closures are force-included in the AUDIT sample (§2.1).' },
         exit_status: { type: 'integer' },
         output_digest: { type: 'string' },
+        artifact_digest: { type: ['string', 'null'], description: 'Identity of the artifact the check actually observed (content hash, or built-output path+size+mtime). Rung 0 (§6.1): binds the check to what ships — an unchanged digest across retries is a disconnected oracle.' },
         timestamp: { type: 'string' },
       },
     },
@@ -208,6 +209,17 @@ const ACTOR_SCHEMA = {
     self_audit: { type: ['string', 'null'] },
     // Set when outcome === 'plan_assumption_false'.
     replan_reason: { type: ['string', 'null'] },
+    // Set when outcome === 'ac_amendment_proposed' (§6.1 anti-goal-erosion): the work is sound
+    // but an AC is unmeetable as written — propose the honest amendment, never quietly narrow.
+    ac_amendment: {
+      type: ['object', 'null'],
+      properties: {
+        ac_id: { type: 'string' },
+        as_written: { type: 'string' },
+        proposed: { type: 'string' },
+        why: { type: 'string' },
+      },
+    },
     notes: { type: ['string', 'null'] },
   },
 }
@@ -262,6 +274,9 @@ version ${C}; consult the full ~/.claude/docs/agent-constitution.md only if a ru
 Mission ${plan.run_id} (class ${MCLASS}, mode ${MODE}) — goal: ${plan.goal}
 Repo: ${REPO}. Deliverable zones (V2 floor): ${JSON.stringify(ZONES)}.
 Plan: ${plan.nodes.map(n => `[${n.id}] ${n.title} (${n.v_class})`).join(' · ')}
+If you lack the tool, evidence, or feasible option to do what is asked, SAY EXACTLY THAT as
+your output ("cannot, because X" / outcome=failed with notes / an empty findings list) — always
+a valid, cheap deliverable. Inventing the appearance of success is the one unforgivable output.
 === END MISSION CONTEXT ===`
 
 function actorPrompt(node) {
@@ -284,7 +299,10 @@ Do the work on the agent branch. Then:
 - If this node is V0/V1: SELECT and RUN a concrete check (prefer a name from the repo
   contract's verifier registry; "${node.check || 'TBD'}" is a suggestion only). You may
   only report outcome="done" if the check actually passed — return its closure_record
-  {check_command, check_source, exit_status, output_digest, timestamp}. check_source is
+  {check_command, check_source, exit_status, output_digest, artifact_digest, timestamp}.
+  VERIFY THE LOOP FIRST (§6.1 rung 0): confirm the check observes the artifact that ships
+  (fresh build, right path) and put that artifact's identity (hash, or path+size+mtime) in
+  artifact_digest — a green against a stale build or wrong path is no close. check_source is
   "registry" ONLY if the command is one named in the repo contract's verifier registry;
   anything you composed yourself is "ad-hoc" (ad-hoc closures are force-audited — mislabeling
   is itself an audit finding). The timestamp MUST be the real
@@ -295,6 +313,10 @@ Do the work on the agent branch. Then:
   list in "files_touched" — reviewers judge from what you push, so push the real thing.
 - If you discover the node's acceptance criteria are themselves wrong / a dependency
   surprise makes them unreachable: outcome="plan_assumption_false" with replan_reason.
+- If an acceptance criterion is unmeetable AS WRITTEN but the work is otherwise sound and an
+  honest narrower criterion exists: outcome="ac_amendment_proposed" with ac_amendment
+  {ac_id, as_written, proposed, why}. NEVER quietly narrow a criterion in prose — an unstated
+  narrowing is goal erosion (§6.1).
 - Commit to the agent branch. Deletions/refactors are fine (git is the audit trail). Never force-push, rebase/amend published, merge to default, or act outward.`
 }
 
@@ -374,11 +396,19 @@ findings list — do NOT manufacture issues to seem useful.`
 // branch, not a summary. This is the high-yield position for cold review: fresh drafts, not
 // the already-scrubbed final deliverable. A quality lever ([model]); never closes a gate.
 function improverPrompt(node, artifact) {
+  // improve_stance "refute" (§3.5 / plan flag): on approach-bearing nodes the improver attacks
+  // the APPROACH at draft time — the only position in the whole pipeline where a thinking error
+  // is still cheap to change (post-freeze gates only ever catch execution errors, per corpus).
+  const job = node.improve_stance === 'refute'
+    ? `Your job is to attack the APPROACH while it is still cheap to change: is this the right
+way to solve this node at all? Hunt design errors, wrong assumptions, missing cases, and
+simpler-or-sounder alternatives — not polish.`
+    : `Your job is to make it STRONGER: surface concrete, specific improvements and anything
+wrong, risky, or missed.`
   return `${govern}
 
 You are an independent reviewer seeing this work COLD — fresh eyes, no knowledge of how it was
-produced. Your job is to make it STRONGER: surface concrete, specific improvements and anything
-wrong, risky, or missed. INSPECT THE ACTUAL CHANGES on the agent branch (read the files / git
+produced. ${job} INSPECT THE ACTUAL CHANGES on the agent branch (read the files / git
 diff) — do not judge from the summary alone. You do NOT need to find a blocker to be useful;
 well-grounded partial suggestions are the point. Avoid vague style nits — every finding must be
 actionable and cite file:line evidence.
@@ -499,8 +529,17 @@ async function runNode(node) {
     return { node: node.id, status: 'replan', reason: actor.replan_reason, actor }
   }
 
+  // AC amendment (§6.1 anti-goal-erosion): the actor proposed an honest criterion change
+  // instead of quietly narrowing. The node proceeds through the normal gate (never selfClosed,
+  // so a fresh critic always fires) and the amendment is injected below as a recorded
+  // accepted-major — the Human's morning veto surface.
+  const _acAmendment = actor.outcome === 'ac_amendment_proposed'
+    ? (actor.ac_amendment || { ac_id: 'unspecified', as_written: '?', proposed: '?', why: actor.notes || 'no detail given' })
+    : null
+
   // Micro-loop (§6.1 tier 1): retry failed V0/V1 self-closure up to cap.
   let tries = 0
+  let _prevDigest = actor.closure_record && actor.closure_record.artifact_digest
   while (actor.outcome === 'failed' && tries < capFor(node, 'micro_loop_retries')) {
     tries++
     const rModel = retryModel(aModel, tries)   // round up one tier per failed close (§3.6)
@@ -511,6 +550,16 @@ async function runNode(node) {
     if (!actor) return { node: node.id, status: 'lost', reason: 'actor died on retry' }
     if (actor.outcome === 'plan_assumption_false')
       return { node: node.id, status: 'replan', reason: actor.replan_reason, actor }
+    // Rung 0 (§6.1): a retry whose artifact identity did not change is iterating against a
+    // disconnected oracle (stale build / wrong path — the thumbnailbar failure class). Stop
+    // paying for the loop; the non-selfClosed R2 downgrade below still gates the node.
+    const _dg = actor.closure_record && actor.closure_record.artifact_digest
+    if (_dg && _prevDigest && _dg === _prevDigest) {
+      log(`Node ${node.id}: artifact_digest unchanged across retry ${tries} — disconnected oracle (§6.1 rung 0); micro-loop stopped.`)
+      actor.notes = `${actor.notes || ''} [rung-0: artifact_digest unchanged across retries — the check is not observing the change; verify build/path before iterating]`.trim()
+      break
+    }
+    _prevDigest = _dg || _prevDigest
   }
 
   // Cold-improver + revision loop (§3.4 improver / §3.3 revision), scoped by mission class.
@@ -619,7 +668,14 @@ async function runNode(node) {
     `accepted-with-reason: gate-fix loop ran ${_fixCycles}/${_gateFixCap} cycle(s)` +
     ` and this major survived; ` +
     `${f.suggested_fix ? `unapplied suggested_fix: ${f.suggested_fix}` : 'no actor-suggested fix on record'}.`
-  for (const _m of verdict.majors) if (_m.reason == null) _m.reason = _majorAcceptReason(_m)
+  for (const _m of verdict.majors) {
+    if (_m.reason == null) _m.reason = _majorAcceptReason(_m)
+    // Deterministic AC-linkage flag (§6.1 anti-goal-erosion telemetry): an accepted major whose
+    // citation resolves to a named AC (not a §-clause) narrowed or contested a criterion — the
+    // signal §7 counts to see where goal erosion concentrates.
+    if (_m.cited_criterion && !/§/.test(String(_m.cited_criterion)) && _citationResolves(_m.cited_criterion, node))
+      _m.ac_related = true
+  }
 
   // Gate-fix yield telemetry (§3.3 / §7). Snapshot HERE — before the cold reviewer below — so
   // cold-caught findings never pollute the resolved counts. Emitted only when the loop was
@@ -636,6 +692,22 @@ async function runNode(node) {
       : _fixCycles >= _gateFixCap ? 'cap_exhausted'
       : 'no_progress',
   } : null
+
+  // AC amendment injection (§6.1 anti-goal-erosion): NOT gate-fixable (it is the honest record
+  // of a criterion change, not a defect a revision can clear), so it enters AFTER the fix loop
+  // and its telemetry snapshot: a recorded accepted-major carrying the structured amendment,
+  // landing in accepted_majors + the decision ledger for the Human's morning veto.
+  if (_acAmendment) {
+    verdict.majors.push({
+      severity: 'major',
+      claim: `AC amendment proposed: ${_acAmendment.ac_id} — "${_acAmendment.as_written}" -> "${_acAmendment.proposed}"`,
+      evidence: _acAmendment.why,
+      cited_criterion: _acAmendment.ac_id,
+      suggested_fix: null,
+      reason: 'accepted-with-reason: actor-proposed AC amendment, recorded for human review — never a quiet narrowing (§6.1)',
+      ac_related: true,
+    })
+  }
 
   // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
   // model call). Fire ONE cold reviewer only to double-check a *clean* verdict on the final
@@ -662,6 +734,7 @@ async function runNode(node) {
     cold_confirmed: coldConfirmed,
     blocked: verdict.blockers.length > 0,
     gate_fix: _gateFixTel,
+    ac_amendment: _acAmendment || undefined,
   }
 }
 

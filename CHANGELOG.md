@@ -3,6 +3,46 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.5.1] — 2026-07-03
+
+Mechanization release: the 0.5.0 problem-solving amendments wired into the mechanism and
+skills. **Constitution text unchanged except the version header** (bumped so run-records
+partition regimes — executor semantics changed). All seven approved items:
+
+### Executor (`executors/mission-executor.workflow.js`)
+- **Rung 0 made mechanical**: `closure_record` gains optional `artifact_digest` (identity of
+  the artifact the check observed); the micro-loop stops when the digest is unchanged across
+  a retry — a constant digest while claiming fixes IS the disconnected oracle (thumbnailbar's
+  five stale-binary rounds, tier012's /tmp false green), and the node still gates at R2.
+- **`ac_amendment_proposed` actor outcome** (§6.1 anti-goal-erosion): structured
+  `{ac_id, as_written, proposed, why}`; never self-closes (no closure ⇒ fresh critic fires);
+  injected after the gate-fix loop as a recorded accepted-major for the Human's morning veto.
+  Ordinary accepted-majors whose citation resolves to a named AC now carry `ac_related: true`
+  (deterministic) so §7 can count where goal erosion concentrates.
+- **`improve_stance:"refute"`** plan flag: the improver attacks the *approach* at draft time
+  on approach-bearing nodes — the only pipeline position where thinking errors are cheap to
+  change (corpus: post-freeze gates only ever caught execution errors).
+- **Cannot-clause in the shared context pack**: lacking the tool/evidence/option, say so —
+  "inventing the appearance of success is the one unforgivable output" (secretary-hallucination
+  class); same clause added to all three `mission_mailbox.py` role prompts.
+
+### Skills & card
+- `mission.md`: **instrument-first rule** in machine-blind zones (instrument node → V1-closing
+  implementation node; no instrument ⇒ V3-deferred at PLAN, never discovered at the smoke);
+  GRILL gains the **"beyond done"** stretch-criteria question; refute-stance and
+  ac-amendment noted at PLAN/EXECUTE.
+- `mission-log-audit.md`: **correction → check mining** (Tier-3's first job): every
+  correction-classified human-diff is asked "is this expressible as a runnable check?" —
+  yes ⇒ draft it into the target repo's verifier registry as a draft PR.
+- `operating-card.md`: cannot-clause (either role), `artifact_digest` in the closure shape,
+  ac-amendment outcome for actors. (+~0.6 KB, worker-facing rules only.)
+
+### Schema (`mission-record.schema.json`, additive)
+- `nodes_executed[].ac_amendment`; `budget_planned_vs_actual.overrun`/`overrun_policy`
+  (aligning with the 0.4.2 executor); **`human_review` now allows extension keys** — the gold
+  signal is never again rejected for being richer than the schema (fixes the two INVALID
+  most-reviewed records; all five regression records validate).
+
 ## [0.5.0] — 2026-07-03
 
 Transcript-grounded amendment batch: three evidence readers swept all 19 run-records, 18

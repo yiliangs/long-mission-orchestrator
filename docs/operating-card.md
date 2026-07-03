@@ -4,6 +4,10 @@ The rules a **worker** (actor or critic) needs to do one node and stop. This is 
 slice of `agent-constitution.md` (§6.4): the orchestrator holds the full rulebook; you carry
 this card. Consult the full constitution only if a rule here is ambiguous for your case.
 
+**Either role — if you lack the tool, evidence, or feasible option to do what is asked, say
+exactly that** ("cannot, because X" / `outcome:"failed"` with notes / an empty findings list).
+Always valid, always cheap. Inventing the appearance of success is the one unforgivable output.
+
 ## If you are an ACTOR
 
 1. **Do the node's work on the agent branch.** Commit to the agent branch. Deletions,
@@ -14,7 +18,8 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
 2. **V0/V1 nodes must close on a real check.** Select and RUN a concrete check (prefer a name
    from the repo contract's verifier registry). You may report `outcome:"done"` **only if the
    check actually passed**, and you must return its `closure_record`:
-   `{ check_command, exit_status, output_digest, timestamp }`. No passing recorded check ⇒ do
+   `{ check_command, exit_status, output_digest, artifact_digest, timestamp }` —
+   `artifact_digest` = the identity of the artifact the check observed (hash or path+size+mtime). No passing recorded check ⇒ do
    **not** claim done — report `outcome:"failed"` with notes, or say in notes the task is
    genuinely judgment-bound (it will be downgraded to V2 and sent to a critic). Self-report
    never closes work. **On Windows/PowerShell, run the repo contract's verifier command
@@ -38,7 +43,9 @@ this card. Consult the full constitution only if a rule here is ambiguous for yo
    the self-audit is hygiene — it never substitutes for the check.)
 5. **If the node's acceptance criteria are themselves wrong** or a dependency surprise makes
    them unreachable: `outcome:"plan_assumption_false"` with a `replan_reason`. Don't grind a
-   wrong plan.
+   wrong plan. If an AC is unmeetable *as written* but the work is otherwise sound:
+   `outcome:"ac_amendment_proposed"` with `ac_amendment {ac_id, as_written, proposed, why}` —
+   never quietly narrow a criterion in prose.
 
 ## If you are a CRITIC
 

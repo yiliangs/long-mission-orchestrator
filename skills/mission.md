@@ -87,6 +87,9 @@ bottlenecked here — it is load-bearing, and it gets a contract, not a vibe.
   `acceptance_criteria` and the only things a blocker may cite, §3.3).
 - **Resolved assumptions** — every branch you would otherwise guess at, with the human's call
   recorded.
+- **Beyond done** — ask once: what would make this *good*, not merely done? Record as
+  non-binding stretch criteria; the report lists them attempted/not (visibility, never a gate —
+  green ACs are a floor, and ambition enters here or never).
 - **Standards to learn** — if a fieldnotes human-diff corpus exists for this repo, pull the
   recurring acceptance criteria and critic prompts mined from it (evolution §"corpus") and
   confirm them here, so the grill front-loads what the human has historically changed.
@@ -112,6 +115,14 @@ judgement): leave it absent and the executor uses the role floor (gates Opus; V0
 Sonnet); raise toward Opus where a V0/V1 node's judgement is subtler than its check; drop a
 V0/V1 actor to Haiku **only** with a rationale asserting pure transport (extract/reformat/
 down-sample). When the call is blurry, leave it absent and let the floor round you up.
+
+**Instrument-first in machine-blind zones (§2.1a).** A node claiming a property the repo's
+checks cannot observe (live runtime, rendered geometry, thread/timing) is planned as TWO nodes:
+first an **instrument node** whose deliverable is a runnable measured assertion (registered
+into the repo contract's verifier registry), then the implementation node closing V1 on it. No
+feasible instrument → the property is `V3-deferred` at PLAN, priced into the human smoke —
+never discovered there. Instruments accrete: each one permanently converts future V2 territory
+in this repo into V1.
 
 **Propose the mission budget (§6.4).** For M1/M2, set mission-level `token_budget`
 (executor-observable output tokens) and `agent_budget` (total spawns) — start from class
@@ -143,7 +154,9 @@ or skips a §3.1-mandated critic. Record `mission_class` and the four classifier
 implementation nodes — a cold-improver→revision pass yields most on complex first-draft code.
 **M2** defaults it on for all a-c implementation nodes (opt out with `improve_pass:false`); M0
 never runs it. (The final-deliverable node is excluded — its panel + cold verifier already cover
-it.)
+it.) On **approach-bearing** nodes (architecture, algorithm, representation choices) set
+`improve_stance:"refute"` — the improver attacks the approach at draft time, the only position
+where a thinking error is still cheap to change; post-freeze gates only catch execution errors.
 
 **Also capture the classification features (§7, record-now-match-later).** Per node, note the
 **path globs** it will touch, the **applicable verifier-registry entry** (or none — itself a
@@ -231,7 +244,8 @@ The executor walks the DAG: fan out parallelizable ready nodes (worktree isolati
 concurrent file mutation), run the cold-improver→revision loop (§3.5) on a-c impl nodes,
 review-gate each node at its frozen **R-tier** (§3.1 — R0 two-phase self-audit, R1 spec-blind
 diff, R2 cold-eye + spot-check, R3 panel), climb the problem-solving ladder (§6.1),
-subtree-replan on "plan assumption false". Honor caps (§6.2) and the **mission budget**
+subtree-replan on "plan assumption false", and surface `ac_amendment_proposed` as a recorded
+accepted-major (an honest criterion change, never a quiet narrowing — §6.1). Honor caps (§6.2) and the **mission budget**
 (§6.4): every spawn shares the canonical context pack (byte-identical prefix → cache hits),
 evidence is pushed to reviewers rather than re-explored, and overrunning `token_budget` or
 `agent_budget` **never halts the run (v0.4.2)** — the walk continues and the overrun is marked
