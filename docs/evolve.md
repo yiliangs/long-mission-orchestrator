@@ -25,10 +25,9 @@ Cheap, narrow, numeric. Tune the cap table (§6.2) from evidence.
 
 1. Read `claude-fieldnotes/mission-caps.jsonl`, filtered to the **current
    constitution_version** (never aggregate across regimes).
-2. Per `(cap)` group, apply the heuristics in `schema/cap-log.format.md`:
-   - raise if >20% hit the limit and most were `would_have_converged`;
-   - lower if p95(used) < limit/2;
-   - else leave.
+2. Per `(cap)` group, apply the adjustment heuristics in `schema/cap-log.format.md` §"How
+   Tier-2 reads it". That file is the single source for the thresholds — do not restate them
+   here or elsewhere; a drifted copy silently mis-calibrates.
 3. Emit a proposed diff to the constitution's §6.2 table: `{cap, current, proposed,
    evidence_stats, rationale}[]`. Much of this is deterministic arithmetic over the jsonl —
    keep the model's role to judgment at the margins, not to inventing numbers.

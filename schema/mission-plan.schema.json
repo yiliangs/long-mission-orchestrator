@@ -50,12 +50,12 @@
     "token_budget": {
       "type": "integer",
       "minimum": 1,
-      "description": "Mission ceiling on executor-observable OUTPUT tokens (§6.4), proposed per mission class at PLAN (M1 ~200K, M2 ~800K) and shown at the go-gate. An honest proxy — cumulative cache-reads are not observable mid-run. Exhaustion = DIVERGED(budget) per §6.3: no new nodes, in-flight nodes close, never a mid-node kill. Never skips a gate or lowers a floor."
+      "description": "Mission ESTIMATE of executor-observable OUTPUT tokens (§6.4 v0.4.2), proposed per mission class at PLAN (M1 ~200K, M2 ~800K) and shown at the go-gate. An honest proxy — cumulative cache-reads are not observable mid-run. An overrun NEVER halts the run: the executor continues and marks the overrun in the final results (mission-level cap_hit + budget.overrun + report line). Never skips a gate or lowers a floor."
     },
     "agent_budget": {
       "type": "integer",
       "minimum": 1,
-      "description": "Mission ceiling on total agent spawns (§6.4) — bounds fan-out multiplication, the cache-read cost the token ceiling cannot see (M1 ~12, M2 ~40). Same exhaustion semantics as token_budget. Planned-vs-actual recorded in the run-record for class calibration (§7)."
+      "description": "Mission ESTIMATE of total agent spawns (§6.4 v0.4.2) — tracks fan-out multiplication, the cache-read cost the token meter cannot see (M1 ~12, M2 ~40). Same overrun semantics as token_budget: continue-and-mark, never halt. Planned-vs-actual recorded in the run-record for class calibration (§7)."
     },
     "deliverable_zones": {
       "type": "array",

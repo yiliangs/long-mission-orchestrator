@@ -87,6 +87,9 @@ bottlenecked here — it is load-bearing, and it gets a contract, not a vibe.
   `acceptance_criteria` and the only things a blocker may cite, §3.3).
 - **Resolved assumptions** — every branch you would otherwise guess at, with the human's call
   recorded.
+- **Beyond done** — ask once: what would make this *good*, not merely done? Record as
+  non-binding stretch criteria; the report lists them attempted/not (visibility, never a gate —
+  green ACs are a floor, and ambition enters here or never).
 - **Standards to learn** — if a fieldnotes human-diff corpus exists for this repo, pull the
   recurring acceptance criteria and critic prompts mined from it (evolution §"corpus") and
   confirm them here, so the grill front-loads what the human has historically changed.
@@ -113,12 +116,22 @@ Sonnet); raise toward Opus where a V0/V1 node's judgement is subtler than its ch
 V0/V1 actor to Haiku **only** with a rationale asserting pure transport (extract/reformat/
 down-sample). When the call is blurry, leave it absent and let the floor round you up.
 
+**Instrument-first in machine-blind zones (§2.1a).** A node claiming a property the repo's
+checks cannot observe (live runtime, rendered geometry, thread/timing) is planned as TWO nodes:
+first an **instrument node** whose deliverable is a runnable measured assertion (registered
+into the repo contract's verifier registry), then the implementation node closing V1 on it. No
+feasible instrument → the property is `V3-deferred` at PLAN, priced into the human smoke —
+never discovered there. Instruments accrete: each one permanently converts future V2 territory
+in this repo into V1.
+
 **Propose the mission budget (§6.4).** For M1/M2, set mission-level `token_budget`
 (executor-observable output tokens) and `agent_budget` (total spawns) — start from class
 defaults (M1: 200K/12; M2: 800K/40) adjusted for plan size, and record the reasoning in one
-line. These freeze with the plan, surface at the go-gate, and exhaustion finalizes the
-mission as `DIVERGED(budget)` (§6.3) — they are proxies the run-record calibrates over time,
-not quality levers: a budget narrows scope, it never skips a gate.
+line. These freeze with the plan and surface at the go-gate. **They are estimates, not
+kill-switches (§6.4 v0.4.2): an overrun never halts the mission — the run keeps going and the
+overrun is marked in the final results** (mission-level `cap_hit` + `budget.overrun` + a
+prominent report line + decision-ledger row). They are proxies the run-record calibrates over
+time, not quality levers: a budget never skips a gate or sheds a quality pass.
 
 **Then classify the mission (§2.4) — by the deterministic classifier, NOT by reasoning.** Write
 the drafted DAG to a `plan.json` and run
@@ -141,7 +154,9 @@ or skips a §3.1-mandated critic. Record `mission_class` and the four classifier
 implementation nodes — a cold-improver→revision pass yields most on complex first-draft code.
 **M2** defaults it on for all a-c implementation nodes (opt out with `improve_pass:false`); M0
 never runs it. (The final-deliverable node is excluded — its panel + cold verifier already cover
-it.)
+it.) On **approach-bearing** nodes (architecture, algorithm, representation choices) set
+`improve_stance:"refute"` — the improver attacks the approach at draft time, the only position
+where a thinking error is still cheap to change; post-freeze gates only catch execution errors.
 
 **Also capture the classification features (§7, record-now-match-later).** Per node, note the
 **path globs** it will touch, the **applicable verifier-registry entry** (or none — itself a
@@ -160,7 +175,7 @@ per finding, you (orchestrator) rule. Blockers must cite. Do **not** loop to con
 **Provision each critic frugally (§6.4 cost) — FIGHT critics are spawned by you, the
 orchestrator, so the operating-card discipline the executor applies does NOT reach them
 automatically; apply it here by hand.** Hand each critic the **operating card**
-(`~/.claude/docs/operating-card.md`), *not* the 36 KB constitution. Pin the artifacts to read —
+(`~/.claude/docs/operating-card.md`), *not* the ~57 KB constitution. Pin the artifacts to read —
 `plan.json` + `brief.md` only — and **bound repo exploration to a spot-check budget**: read only
 the specific paths a node's `write_set`/instruction names, read-only, to test a *specific*
 premise; trust declared paths unless a concrete claim needs checking. Do **not** instruct a
@@ -193,7 +208,10 @@ each be one glance to catch before go.
 **Arm the heartbeat (constitution §11) for M1/M2** — as soon as `.mission/<run-id>/` exists
 at PLAN, **not** here at freeze: §11 requires arming at launch, because a session that dies
 grilling or fighting cannot schedule its own resurrection (the natalie-fable-revision run died
-exactly there — usage limit mid-PLAN, no heartbeat armed, recovery was manual). Arm with:
+exactly there — usage limit mid-PLAN, no heartbeat armed, recovery was manual). **Arming is a
+Human action** — the permission classifier denies agent-side `schtasks` (the same fact
+`/mission-loop` §Driver records), so hand the Human the arm command at launch rather than
+running it yourself:
 
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File ~/.claude/scripts/mission_heartbeat.ps1 arm -RunDir <repo>/.mission/<run-id>
@@ -226,12 +244,14 @@ The executor walks the DAG: fan out parallelizable ready nodes (worktree isolati
 concurrent file mutation), run the cold-improver→revision loop (§3.5) on a-c impl nodes,
 review-gate each node at its frozen **R-tier** (§3.1 — R0 two-phase self-audit, R1 spec-blind
 diff, R2 cold-eye + spot-check, R3 panel), climb the problem-solving ladder (§6.1),
-subtree-replan on "plan assumption false". Honor caps (§6.2) and the **mission budget**
+subtree-replan on "plan assumption false", and surface `ac_amendment_proposed` as a recorded
+accepted-major (an honest criterion change, never a quiet narrowing — §6.1). Honor caps (§6.2) and the **mission budget**
 (§6.4): every spawn shares the canonical context pack (byte-identical prefix → cache hits),
-evidence is pushed to reviewers rather than re-explored, and exhausting `token_budget` or
-`agent_budget` finalizes as `DIVERGED(budget)` — no new nodes, in-flight nodes close, never a
-mid-node kill. Bind and record closure records for V0/V1 (§2.1). Finalize on divergence,
-never on a clock (§6.3).
+evidence is pushed to reviewers rather than re-explored, and overrunning `token_budget` or
+`agent_budget` **never halts the run (v0.4.2)** — the walk continues and the overrun is marked
+in the final results (cap_hit + budget.overrun + report line). Bind and record closure records
+for V0/V1 (§2.1). Finalize on divergence — lack of progress — never on a clock or a budget
+(§6.3).
 
 ### 6. AUDIT → DELIVER
 Whole-deliverable review against the plan's own acceptance criteria + constitution. **Depth

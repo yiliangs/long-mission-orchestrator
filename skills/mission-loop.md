@@ -140,8 +140,8 @@ brief-synthesis, and the deliverable is committed to the lineage instead of deli
      `.mission/<cycle-run-id>/` with a **flat** `<cycle-run-id>` = `loop-<slug>-cycle-<NN>` (no
      slash); its `REPORT.md` / `report.json` / `mission_records/<cycle-run-id>.json` are written as
      for any `/mission`. Do **not** nest it under `loop-<slug>/`: the heartbeat derives the repo
-     root by stripping exactly two path segments (`Resolve-Roots`, `mission_heartbeat.ps1:48`) and
-     its task id by `Split-Path -Leaf` (`:73`), both of which assume the canonical
+     root by stripping exactly two path segments (`Resolve-Roots` in `mission_heartbeat.ps1`) and
+     its task id by `Split-Path -Leaf`, both of which assume the canonical
      `<repo>/.mission/<run-id>` shape — a three-deep path breaks the root derivation and collides
      every loop's leaf to `cycle-<NN>`. A flat id also keeps `mission_records/<cycle-run-id>.json`
      a flat file.
@@ -149,19 +149,19 @@ brief-synthesis, and the deliverable is committed to the lineage instead of deli
      the loop level (`.mission/loop-<slug>/`, Driver §) — the §11 one-driver-only invariant; a loop
      must **not** let each cycle arm its own. **Honesty caveat — this suppression is discipline, not
      yet a mechanism:** `/mission` arms its heartbeat automatically at PLAN
-     (`skills/mission.md:193`) and there is no `--no-heartbeat` flag today, so "cycles don't arm" is
+     (`skills/mission.md`, FREEZE § arm-the-heartbeat) and there is no `--no-heartbeat` flag today, so "cycles don't arm" is
      **orchestrator discipline, not a gate** — same class as the budget ceiling below. Until
      `/mission` grows a launched-under-loop no-arm mode (**specified, not yet wired**), the loop
      refrains from per-cycle arming by hand. A cycle that arms anyway self-disarms at its own DELIVER
-     (its `REPORT.md` lands in its flat sibling run-dir, `:128`) — bounded and self-cleaning — but
+     (its `REPORT.md` lands in its flat sibling run-dir) — bounded and self-cleaning — but
      until the no-arm mode lands it transiently risks a second §11 driver; that is the one real
      hazard this gap leaves open, flagged not hidden. The loop keeps its single heartbeat fed by
      writing its **own**
      per-cycle progress into `loop-<slug>/` each cycle (the `cycle-<NN>.report.md` overlay + the
-     lineage-ledger update), which the heartbeat's recursive artifact-mark scan (`:153-155`) reads
-     as liveness — so a live driver is never misjudged futile (`:180`) without ever reaching into a
+     lineage-ledger update), which the heartbeat's recursive artifact-mark scan reads
+     as liveness — so a live driver is never misjudged futile without ever reaching into a
      cycle's sibling run-dir. Self-disarm safety comes from the **filename reservation** (the loop
-     writes `loop-<slug>/REPORT.md` only at finalization, so the root-only self-disarm `:128` fires
+     writes `loop-<slug>/REPORT.md` only at finalization, so the root-only self-disarm fires
      only when the loop ends), not from any nesting.
 4. **Commit to the lineage** (replaces deliver-and-stop):
    - **Depth:** commit on `agent/loop-<slug>`; at a milestone cut `agent/loop-<slug>/m<NN>`.
@@ -246,8 +246,8 @@ again. Instead:
     report under `loop-<slug>` instead would route to a `mission_records/loop-<slug>.json` that no
     cycle created.)
   - **The filename is deliberately not `REPORT.md`.** The §11 heartbeat self-disarms the instant a
-    `REPORT.md` appears in its run-dir (`mission_heartbeat.ps1:128`, "DELIVER leaves
-    REPORT.md"). A loop that wrote `loop-<slug>/REPORT.md` every loud cycle would kill its own
+    `REPORT.md` appears in its run-dir (the "DELIVER leaves REPORT.md" check in
+    `mission_heartbeat.ps1`). A loop that wrote `loop-<slug>/REPORT.md` every loud cycle would kill its own
     overnight driver on cycle 1. So **`.mission/loop-<slug>/REPORT.md` is reserved for loop
     finalization only** (budget ceiling / Human stop) — and writing it there is exactly what makes
     the heartbeat self-disarm fire correctly, when the loop has actually ended.
@@ -274,7 +274,7 @@ again. Instead:
   Overnight runs `--unattended` (proceed-on-silence) under the contact leash + budget ceiling.
   This is correct only because per-cycle reports are written as `cycle-<NN>.report.md` (above) and
   `loop-<slug>/REPORT.md` appears **only at finalization** — so the heartbeat's REPORT.md-means-
-  delivered self-disarm (`mission_heartbeat.ps1:128`) fires when the loop ends, not mid-loop.
+  delivered self-disarm (`mission_heartbeat.ps1`) fires when the loop ends, not mid-loop.
   Feral overnight is the maximum-trust combo — require the explicit `--feral` double-opt-in, and
   see the feral-terminator note in Mode: under feral the only live terminators are the budget
   ceiling (orchestrator-counted) and a Human stop.

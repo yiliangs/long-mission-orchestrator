@@ -84,6 +84,13 @@ Record each verdict where it belongs — actively, not awaited:
 - **in-session post-mission talk counts** (§7): when the Human raises a mission-attributable
   issue in conversation, capture it into the run-record then and there — don't wait for the
   next audit cycle to re-ask;
+- **correction → check (Tier-3's first job, evolution.md):** for every correction-classified
+  human-diff, ask one more question: *is this fix expressible as a runnable check?* If yes,
+  draft the check and stage it into the target repo's `## Agent contract` verifier registry
+  (agent branch + draft PR — the Human merges, §9), and link it in `human_review`. One
+  recurrence suffices — the measure-before-claim class recurred three times only because
+  nothing mined it the first time. This is what makes work-layer lessons accumulate the way
+  framework-layer lessons already do;
 - merge decisions stay the Human's (§9.2) — this skill never merges.
 
 ## Maker/checker

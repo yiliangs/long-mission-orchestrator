@@ -166,20 +166,10 @@ audit cadence fires ──▶ evolution pass generates batch ──▶ writes pr
                                                           commit, deploy, confirm by email
 ```
 
-- **Tier 2 `calibrate`** fires on mission volume (~every 10 records).
-- **Tier 3 `evolve`** fires on a calendar cadence (monthly / post-milestone).
-- Both are background routines that **generate and email**, then stop.
-
-The line the perimeter draws is between *proposing* and *applying*, not between *automated*
-and *manual*. **Generating a proposal is automated** — proposing is additive and safe, and
-the proposal is itself adversarially critiqued before it reaches your inbox. **Applying an
-amendment always waits for your grant.** A system that could silently *apply* its own
-constitution change on a timer is the failure mode the perimeter prevents; a system that
-*drafts and emails* one is just doing its homework. The loop is closed by evidence,
-gated by you.
-
-**Activation is deferred until run-records exist** (post Phase 1). an evolution pass over an empty
-corpus has nothing to propose.
+Cadences, the generate→email→grant→apply steps, and the proposing-vs-applying perimeter
+argument live in `docs/evolve.md` — the procedure is the single source; this diagram is the
+map. **Activation is deferred until run-records exist** (post Phase 1): an evolution pass
+over an empty corpus has nothing to propose.
 
 ## The JS-vs-prose leak audit (a recurring diagnostic)
 

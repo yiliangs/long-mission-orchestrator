@@ -3,6 +3,156 @@
 Notable changes to long-mission-orchestrator. The version tracks the governing constitution
 version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [0.5.1] — 2026-07-03
+
+Mechanization release: the 0.5.0 problem-solving amendments wired into the mechanism and
+skills. **Constitution text unchanged except the version header** (bumped so run-records
+partition regimes — executor semantics changed). All seven approved items:
+
+### Executor (`executors/mission-executor.workflow.js`)
+- **Rung 0 made mechanical**: `closure_record` gains optional `artifact_digest` (identity of
+  the artifact the check observed); the micro-loop stops when the digest is unchanged across
+  a retry — a constant digest while claiming fixes IS the disconnected oracle (thumbnailbar's
+  five stale-binary rounds, tier012's /tmp false green), and the node still gates at R2.
+- **`ac_amendment_proposed` actor outcome** (§6.1 anti-goal-erosion): structured
+  `{ac_id, as_written, proposed, why}`; never self-closes (no closure ⇒ fresh critic fires);
+  injected after the gate-fix loop as a recorded accepted-major for the Human's morning veto.
+  Ordinary accepted-majors whose citation resolves to a named AC now carry `ac_related: true`
+  (deterministic) so §7 can count where goal erosion concentrates.
+- **`improve_stance:"refute"`** plan flag: the improver attacks the *approach* at draft time
+  on approach-bearing nodes — the only pipeline position where thinking errors are cheap to
+  change (corpus: post-freeze gates only ever caught execution errors).
+- **Cannot-clause in the shared context pack**: lacking the tool/evidence/option, say so —
+  "inventing the appearance of success is the one unforgivable output" (secretary-hallucination
+  class); same clause added to all three `mission_mailbox.py` role prompts.
+
+### Skills & card
+- `mission.md`: **instrument-first rule** in machine-blind zones (instrument node → V1-closing
+  implementation node; no instrument ⇒ V3-deferred at PLAN, never discovered at the smoke);
+  GRILL gains the **"beyond done"** stretch-criteria question; refute-stance and
+  ac-amendment noted at PLAN/EXECUTE.
+- `mission-log-audit.md`: **correction → check mining** (Tier-3's first job): every
+  correction-classified human-diff is asked "is this expressible as a runnable check?" —
+  yes ⇒ draft it into the target repo's verifier registry as a draft PR.
+- `operating-card.md`: cannot-clause (either role), `artifact_digest` in the closure shape,
+  ac-amendment outcome for actors. (+~0.6 KB, worker-facing rules only.)
+
+### Schema (`mission-record.schema.json`, additive)
+- `nodes_executed[].ac_amendment`; `budget_planned_vs_actual.overrun`/`overrun_policy`
+  (aligning with the 0.4.2 executor); **`human_review` now allows extension keys** — the gold
+  signal is never again rejected for being richer than the schema (fixes the two INVALID
+  most-reviewed records; all five regression records validate).
+
+## [0.5.0] — 2026-07-03
+
+Transcript-grounded amendment batch: three evidence readers swept all 19 run-records, 18
+run dirs, the full heartbeat log, and 16 session long-logs; every change cites its runs.
+Net size: the constitution **shrank 564 bytes** (58,005 → 57,441) — additions paid for by
+cuts. Rule changes: comparability partitions at 0.5.0.
+
+### Changed
+- **§11 heartbeat demoted from pilot to watchdog.** Field record: 0/5 autonomous resumes
+  produced mission progress; the same death escalated ~34 times over 21.5h
+  (2026-07-02-salary-atlas); beats fired after claimed self-disarm. New job: detect death
+  fast, escalate once, leave a prepared one-tap relaunch command; the Human arms (the
+  classifier denies agent-side `schtasks`); disarm is verified; the "absorbs every death
+  mode" claim is removed as unearned.
+- **§12 DELIVER closes like a V1 node** — `validate_record.py` bound as the check on both
+  record and report, the stamped cap-log line part of the same close, failure ships as a
+  top-of-report alarm. (Evidence: 3 schema-invalid records, 4 run dirs with no REPORT.md,
+  the one budget-DIVERGED run absent from the cap log.)
+- **§6.1 rung 0: verify the loop** — the check must observe the artifact that ships
+  (tier012 `/tmp` false green; thumbnailbar's five smoke rounds against a stale binary);
+  mirrored into the §2.1 closure-record binding and the operating card.
+- **§6.1 anti-goal-erosion clause** — an AC unmeetable as written is
+  `plan_assumption_false` or a written accepted-major narrowing, never a quiet reword.
+  (4 runs closed ACs on narrowed readings; 13 accepted-majors in salary-atlas; zero
+  `plan_assumption_false` ever emitted across 18 runs.)
+- **§2.4 M-class honesty** — the script guards the M0/M1 floor; judgment supplies M2
+  (0/6 observed M2 classifications came from the script gate).
+- **§6 matched to observed reality** — punchlist: capped audit cycles or a
+  Human-commissioned follow-up mission (the proven pattern); the question log struck from
+  DELIVER (0/18 runs produced one; nothing consumed it).
+- **§3.2 evidence defined** — diff, committed artifact, or check transcript; narrative
+  prose alone is not evidence (3 runs closed on prose-only evidence); mirrored to card.
+
+### Tightened (paying for the additions)
+- §1.5 perimeter shadow-list reduced to category names + §9.1 pointer (single source).
+- §5 compressed to one paragraph; §6 GRILL block reduced to a §4 pointer; §3.4
+  token-discipline and §3.5 provenance paragraphs compressed; §6.4 duplicate R0 line cut;
+  §6.5 rationale compressed; §3.6 round-up paragraph collapsed to a §2.2 citation; §10
+  heading de-forked.
+
+## [0.4.4] — 2026-07-03
+
+Second `/prune` pass, this time on the constitution itself. Non-normative text only — no
+rule changes; non-comparability-breaking (aggregates with 0.4.2/0.4.3).
+
+### Removed
+- **§6.4** salary-atlas provenance parenthetical — the full story (run, ceiling, human
+  directive) lives in this changelog's 0.4.2 entry; history belongs in the changelog and
+  git, not the governing body (§13's own doctrine).
+- **§12** dead "(v0.1 — expected to evolve)" tag on the report format — the format already
+  evolved in place (plain layer, decision ledger); the tag tracked nothing.
+
+### Changed
+- **§6.2** "Review per a-c task" row compressed to a §3.1 pointer plus its one real number
+  (R2 spot-check ≤5 reads) — the row restated the V→R floors and would silently drift
+  whenever §3.1 moves.
+
+## [0.4.3] — 2026-07-03
+
+Doc-hygiene release from a `/prune` audit of the whole doc tree. Clarifications only — no
+rule changes; non-comparability-breaking per evolution.md's amendment split, so records may
+aggregate with 0.4.2.
+
+### Changed
+- **§6.4 size claims corrected**: operating card ~1–2 KB → ~5 KB (actual 4.8 KB);
+  constitution ~26 KB → ~57 KB (actual 58 KB). Descriptive only.
+- **`schema/cap-log.format.md` rewritten to match the real feed**: one line per mission at
+  DELIVER (was: one line per node-cap-hit), `cap_hits[]` entries carrying
+  `would_have_converged`, `<cap>_used`/`<cap>_cap` pairs, budget planned-vs-actual; cap enum
+  extended with `gate_fix_cycles`, `token_budget`, `agent_budget` (the corpus already uses
+  them); legacy line heterogeneity documented; append-only preserved.
+- **Tier-2 thresholds single-sourced**: `docs/evolve.md` now cites cap-log.format.md instead
+  of restating the raise/lower numbers; `docs/evolution.md` §Triggering deduplicated to
+  diagram + pointer (evolve.md is the procedure authority).
+- **Stale refs fixed across the tree**: README status v0.3.x → v0.4.x and the superseded
+  0.4.2 budget row annotated; `/evolve apply` → email GRANT router in `proposals/README.md`;
+  `skills/mission.md` heartbeat arming corrected to a Human action (the permission classifier
+  denies agent-side `schtasks`); stale constitution-size figures in `skills/mission.md`;
+  drifted `mission_heartbeat.ps1` line cites in `skills/mission-loop.md` replaced with stable
+  function/marker anchors.
+- **Deferred (flagged, not changed)**: §3.6 hard-codes "Opus" as the top tier while the
+  principle says "strongest model" — to be amended at the next capability re-baseline
+  (evolve.md already anticipates Opus→Fable).
+
+## [0.4.2] — 2026-07-03
+
+Budget-overrun release, born from §7 post-session intake: the 2026-07-02-salary-atlas M2 run
+halted at its 2M token ceiling with 14/20 nodes done and the entire deliverable tail (blend,
+fact-checks, explorer, QA, assembly) unopened — a DIVERGED(budget) that cost a human
+round-trip solely to grant more budget. Human directive: "If budget is over estimation, keep
+running, just mark the budget overrun into final results."
+
+### Changed
+- **§6.4 budget semantics: continue-and-mark, never halt.** The mission budget
+  (`token_budget` / `agent_budget`) is an **estimate and reporting tripwire, not a
+  kill-switch**. Overrunning it never stops node-opening, never sheds quality passes
+  (improver, gate-fix cycles), never truncates a gate. The overrun is marked in the final
+  results: mission-level `cap_hit`, explicit `budget.overrun` in the run-record, a prominent
+  report line, and a decision-ledger row. Runaway protection is §6.3 progress-based
+  divergence plus the harness's absolute spawn cap.
+- **§6.3:** budget exhaustion removed from the divergence definition — divergence is a
+  lack-of-progress verdict only.
+- **Executor (`executors/mission-executor.workflow.js`):** wave-granularity budget halt
+  replaced with a one-time overrun log; budget guards removed from the improver and gate-fix
+  loops; verdict no longer keys off budget state; `budget.overrun` + `overrun_policy` added
+  to the budget report. (Line endings normalized CRLF→LF — required by the Workflow
+  permission layer.)
+- **`schema/mission-plan.schema.json`** `token_budget` / `agent_budget` descriptions and
+  **`skills/mission.md`** PLAN/EXECUTE budget language aligned.
+
 ## [0.4.1] — 2026-06-28
 
 Coverage-honesty release. Closes the gap a `/mission-log-audit` diagnosis surfaced: a machine
