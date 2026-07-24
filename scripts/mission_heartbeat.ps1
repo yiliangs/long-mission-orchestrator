@@ -1,25 +1,20 @@
-# LMO mission heartbeat (constitution section 11) -- orchestrator-armed auto-resume.
+# LMO mission heartbeat: orchestrator-armed recovery from committed mission state.
 #
-# The 5-hour usage window (and crashes, reboots, power loss) must not kill a mission. The
-# orchestrator ARMS a per-run scheduled task as soon as .mission/<run-id>/ exists, and DISARMS
-# it at DELIVER. Each BEAT is idempotent:
-#   active run            -> exit (something touched the run dir or transcript recently)
-#   interrupted marker    -> headless resume from committed state (claude -p --resume)
-#   complete/absent marker-> VERIFIED self-disarm + exit (delete is proven with a query --
-#                            a claimed disarm that keeps firing is the section-12 alarm class)
-#   heartbeat.dead present-> tombstone: quiet re-disarm only; the same death is NEVER
-#                            escalated twice (section 11). Dead-escalation also writes
-#                            heartbeat.relaunch.cmd -- the human's one-tap resume.
+# A crash, reboot, or usage-window boundary must not erase a mission. The orchestrator arms a
+# per-run scheduled task after freeze and disarms it at delivery. Each beat is idempotent:
+#   active run             -> exit
+#   interrupted run        -> resume from committed plan, journal, witnesses, and branch state
+#   complete or absent run -> verify task deletion, then exit
+#   heartbeat.dead present -> quiet re-disarm; escalate the same failure only once
 #
-#   arm:     powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 arm    -RunDir <repo>\.mission\<run-id>
+#   arm:     powershell.exe -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 arm    -RunDir <repo>\.mission\<run-id>
 #   beat:    (scheduled task only)                          mission_heartbeat.ps1 beat   -Lock <run-dir>\mission.lock
-#   disarm:  powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 disarm -RunDir <repo>\.mission\<run-id>
-#   status:  powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 status -RunDir <repo>\.mission\<run-id>
+#   disarm:  powershell.exe -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 disarm -RunDir <repo>\.mission\<run-id>
+#   status:  powershell.exe -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 status -RunDir <repo>\.mission\<run-id>
 #
-# Headless resume carries a PER-INVOCATION grant (--allowedTools "Workflow") so the resumed
-# session can re-drive the executor. The human authorizes this at launch: arming the heartbeat
-# is part of the mission launch they approve (section 11). No standing settings.json change --
-# the grant lives only on the two claude command lines below and dies with each invocation.
+# Headless resume carries a per-invocation grant for the tools needed to reconstruct state,
+# run the canonical executor, and write delivery artifacts. Arming authorizes that recovery
+# path for this run only; no standing settings change is made.
 param(
     [Parameter(Mandatory = $true, Position = 0)][ValidateSet('arm', 'beat', 'disarm', 'status')]
     [string]$Action,
@@ -30,7 +25,7 @@ param(
     [int]$RunawayStop = 20,   # insurance against a fooled progress detector -- NOT a policy knob.
                               # Recovery resumes are uncounted by design (a mission spanning N usage
                               # windows legitimately resumes N times); futility detection below is
-                              # the real section-11 guard. This only brakes a runaway edge case.
+                              # the real recovery guard. This only brakes a runaway edge case.
     [switch]$DryRun,          # beat: log the resume decision but do not launch claude
     [switch]$ForceResume      # beat: human one-tap relaunch (heartbeat.relaunch.cmd) -- clears the
                               # tombstone + ledger and resumes regardless of staleness
@@ -55,14 +50,33 @@ function Log([string]$msg) {
 # char with '-'. Worktree sessions write their transcript under the MAIN repo's project dir.
 function Encode-ProjectDir([string]$path) { return ($path -replace '[^A-Za-z0-9]', '-') }
 
-# VERIFIED disarm (section 11). The old shape -- `try { schtasks /Delete ... } catch { }` --
+function Get-RunKey([string]$runDir) {
+    $normalized = [System.IO.Path]::GetFullPath($runDir).TrimEnd('\').ToLowerInvariant()
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($normalized)
+        $hash = [System.BitConverter]::ToString($algorithm.ComputeHash($bytes)).Replace('-', '')
+        return $hash.Substring(0, 12)
+    }
+    finally { $algorithm.Dispose() }
+}
+
+function Get-TaskName([string]$runDir, [string]$runId) {
+    return "LMO\Heartbeat-$runId-$(Get-RunKey $runDir)"
+}
+
+function Get-WrapperPath([string]$runDir, [string]$runId) {
+    return Join-Path $ScriptsDir "heartbeat-$runId-$(Get-RunKey $runDir).cmd"
+}
+
+# Verified disarm. The old shape -- `try { schtasks /Delete ... } catch { }` --
 # swallowed every failure, so a beat could log "self-disarm" while the task kept firing
 # (observed: ~34 re-escalations over 21.5h on 2026-07-02-salary-atlas). Delete via cmd /c
 # (no PowerShell stderr-stream wrapping under ErrorActionPreference=Stop), then PROVE the
 # task is gone with a query. Returns $true only when the task provably no longer exists.
-function Disarm-Task([string]$taskName, [string]$runId) {
+function Disarm-Task([string]$taskName, [string]$wrapperPath) {
     cmd /c "schtasks /Delete /F /TN `"$taskName`" >nul 2>&1" | Out-Null
-    Remove-Item (Join-Path $ScriptsDir "heartbeat-$runId.cmd") -ErrorAction SilentlyContinue
+    Remove-Item $wrapperPath -ErrorAction SilentlyContinue
     cmd /c "schtasks /Query /TN `"$taskName`" >nul 2>&1" | Out-Null
     return ($LASTEXITCODE -ne 0)   # query failing to find it is the proof of deletion
 }
@@ -96,8 +110,16 @@ switch ($Action) {
         $RunDir = (Resolve-Path $RunDir).Path
         $runId = Split-Path -Leaf $RunDir
         $roots = Resolve-Roots $RunDir
-        $taskName = "LMO\Heartbeat-$runId"
+        $taskName = Get-TaskName $RunDir $runId
+        $wrapperPath = Get-WrapperPath $RunDir $runId
+        $wrapperName = Split-Path -Leaf $wrapperPath
         $lockPath = Join-Path $RunDir 'mission.lock'
+        $driverPid = 0
+        $driverStarted = $null
+        if ([int]::TryParse($env:CLAUDE_PID, [ref]$driverPid) -and $driverPid -gt 0) {
+            $driverProcess = Get-Process -Id $driverPid -ErrorAction SilentlyContinue
+            if ($driverProcess) { $driverStarted = $driverProcess.StartTime.ToUniversalTime().ToString('o') }
+        }
 
         $cfg = [ordered]@{
             run_id         = $runId
@@ -105,6 +127,9 @@ switch ($Action) {
             cwd            = $roots[1]                     # main repo root: where transcripts + resume live
             project_prefix = Encode-ProjectDir $roots[1]
             task           = $taskName
+            driver_pid     = $driverPid
+            driver_started = $driverStarted
+            driver_session = $env:CLAUDE_CODE_SESSION_ID
             interval_min   = $IntervalMin
             stale_min      = $StaleMin
             armed_at       = (Get-Date -Format 'o')
@@ -118,7 +143,7 @@ switch ($Action) {
                     (Join-Path $RunDir 'heartbeat.disarmed'), (Join-Path $RunDir 'heartbeat.relaunch.cmd') -ErrorAction SilentlyContinue
 
         # Per-run beat wrapper (hard-coded lock path) so run_hidden.vbs needs no arg plumbing.
-        $cmdPath = Join-Path $ScriptsDir "heartbeat-$runId.cmd"
+        $cmdPath = $wrapperPath
         @"
 @echo off
 REM Auto-generated by mission_heartbeat.ps1 arm -- beat wrapper for run $runId.
@@ -127,13 +152,22 @@ REM Wrapper output goes to its OWN log: a `>> heartbeat.log` here holds the file
 REM entire beat (hours during a resume) and starves the ps1's Add-Content to the same file --
 REM the observed 139 "process cannot access the file" collisions. The wrapper log is a crash
 REM net only; real telemetry is heartbeat.log, written solely by the ps1.
-powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -Lock "$lockPath" >> "%USERPROFILE%\.claude\heartbeat.wrapper.log" 2>&1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -Lock "$lockPath" >> "%USERPROFILE%\.claude\heartbeat.wrapper.log" 2>&1
 "@ | Set-Content -Path $cmdPath -Encoding ASCII
 
         $vbs = Join-Path $ScriptsDir 'run_hidden.vbs'
         if (-not (Test-Path $vbs)) { throw "run_hidden.vbs not deployed -- run scripts\deploy.ps1 first" }
         try { schtasks /Delete /F /TN $taskName 2>$null | Out-Null } catch { }
-        schtasks /Create /F /TN $taskName /TR "wscript.exe `"$vbs`" heartbeat-$runId.cmd" /SC MINUTE /MO $IntervalMin | Out-Null
+        schtasks /Create /F /TN $taskName /TR "wscript.exe `"$vbs`" $wrapperName" /SC MINUTE /MO $IntervalMin | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Remove-Item $lockPath, $cmdPath -ErrorAction SilentlyContinue
+            throw "Failed to create scheduled task $taskName (exit $LASTEXITCODE)"
+        }
+        schtasks /Query /TN $taskName 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Remove-Item $lockPath, $cmdPath -ErrorAction SilentlyContinue
+            throw "Scheduled task $taskName was not registered"
+        }
         Log "ARM   $runId  task=$taskName every ${IntervalMin}min  stale>${StaleMin}min  lock=$lockPath"
     }
 
@@ -141,14 +175,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         if (-not $Lock) { throw 'beat requires -Lock' }
         $runDirFromLock = Split-Path -Parent $Lock
         $runId = Split-Path -Leaf $runDirFromLock
-        $taskName = "LMO\Heartbeat-$runId"
+        $taskName = Get-TaskName $runDirFromLock $runId
+        $wrapperPath = Get-WrapperPath $runDirFromLock $runId
 
         # Absent marker -> disarm + exit (mission ended and cleaned up, or run dir gone).
         # Quiet retry loop by construction: if the verified delete fails, the next beat lands
         # here again and re-attempts -- one line of log per beat, never an escalation.
         if (-not (Test-Path $Lock)) {
-            $ok = Disarm-Task $taskName $runId
-            Log "BEAT  $runId  lock absent -> self-disarm $(if ($ok) {'verified'} else {'FAILED - task still registered (section 12 alarm)'})"
+            $ok = Disarm-Task $taskName $wrapperPath
+            Log "BEAT  $runId  lock absent -> self-disarm $(if ($ok) {'verified'} else {'FAILED - task still registered (human-attention alarm)'})"
             exit 0
         }
         $cfg = Get-Content $Lock -Raw | ConvertFrom-Json
@@ -161,20 +196,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             Log "BEAT  $runId  -ForceResume (human relaunch) -> tombstone + futility ledger cleared"
         }
 
-        # Tombstone (section 11 -- the same death is NEVER escalated twice): heartbeat.dead means
+        # Tombstone (recovery invariant -- the same death is NEVER escalated twice): heartbeat.dead means
         # a prior beat already escalated this death. If we are still firing, that beat's disarm
         # evidently failed -- quietly re-attempt + verify, never re-escalate, never resume.
         # (The observed failure: ~34 consecutive dead-escalations, one per beat, 2026-07-02.)
         if (Test-Path (Join-Path $cfg.run_dir 'heartbeat.dead')) {
-            $ok = Disarm-Task $taskName $runId
+            $ok = Disarm-Task $taskName $wrapperPath
             Log "BEAT  $runId  tombstone present -> quiet re-disarm $(if ($ok) {'verified'} else {'FAILED - task still registered'}) -> exit"
             exit 0
         }
-        # Zombie beat (section 11 -- disarm is verified): heartbeat.disarmed is written only after
+        # Zombie beat (recovery invariant -- disarm is verified): heartbeat.disarmed is written only after
         # a PROVEN task deletion, so a beat firing past it means the task returned from the dead.
         if (Test-Path (Join-Path $cfg.run_dir 'heartbeat.disarmed')) {
-            $ok = Disarm-Task $taskName $runId
-            Log "BEAT  $runId  ZOMBIE beat after verified disarm (section 12 alarm) -> re-disarm $(if ($ok) {'verified'} else {'FAILED'}) -> exit"
+            $ok = Disarm-Task $taskName $wrapperPath
+            Log "BEAT  $runId  ZOMBIE beat after verified disarm (human-attention alarm) -> re-disarm $(if ($ok) {'verified'} else {'FAILED'}) -> exit"
             exit 0
         }
 
@@ -182,13 +217,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         # but the beat self-disarms as a backstop). Verified: only a PROVEN deletion writes the
         # heartbeat.disarmed marker; a failed delete keeps the lock so the next beat retries.
         if (Test-Path (Join-Path $cfg.run_dir 'REPORT.md')) {
-            $ok = Disarm-Task $taskName $runId
+            $ok = Disarm-Task $taskName $wrapperPath
             Log "BEAT  $runId  REPORT.md present -> mission delivered -> self-disarm $(if ($ok) {'verified'} else {'FAILED - task still registered; retrying next beat'})"
             if ($ok) {
                 Get-Date -Format 'o' | Set-Content -Path (Join-Path $cfg.run_dir 'heartbeat.disarmed') -Encoding ASCII
                 Remove-Item $Lock -ErrorAction SilentlyContinue
             }
             exit 0
+        }
+
+        # The driver that armed recovery owns the run while its exact process instance lives.
+        # PID plus start time avoids mistaking a later process that reused the PID for the driver.
+        if (-not $ForceResume -and $cfg.driver_pid -and $cfg.driver_started) {
+            $driver = Get-Process -Id ([int]$cfg.driver_pid) -ErrorAction SilentlyContinue
+            if ($driver -and $driver.StartTime.ToUniversalTime().ToString('o') -eq [string]$cfg.driver_started) {
+                Log "BEAT  $runId  active driver pid=$($cfg.driver_pid) session=$($cfg.driver_session) -> exit"
+                exit 0
+            }
         }
 
         # Two DISTINCT signals, deliberately not the same timestamp:
@@ -200,7 +245,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         #     and produces zero mission progress. Folding the transcript in here would let an
         #     unproductive resume masquerade as progress and slip past the one-futile-resume cap (the
         #     RunawayStop=20 cousin of the original 23-firing loop). Real work touches the run dir
-        #     (the canonical section-11 recovery state), so a productive resume still advances this.
+        #     (the canonical recovery recovery state), so a productive resume still advances this.
         #
         #   $newest -- newest activity of ANY kind, transcript included. This is the STALENESS signal:
         #     a live session actively driving the run keeps its transcript warm, so idle detection
@@ -220,7 +265,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             exit 0
         }
 
-        # Section-11 invariant -- "a stale heartbeat survives at most one FUTILE firing." Resume is
+        # Recovery invariant -- "a stale heartbeat survives at most one FUTILE firing." Resume is
         # recovery plumbing: a mission that spans N usage windows legitimately resumes N times, so
         # recovery resumes are UNCOUNTED. The only thing this ledger detects is FUTILITY -- a resume
         # that produced no new mission ARTIFACT (not just transcript noise) is a dead resume, and
@@ -229,8 +274,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
         # per beat). Futility is measured against $artifactMark, NOT $newest -- a resume that loaded,
         # echoed, and died touches only the transcript, which $artifactMark excludes by design. One
         # futile resume => DISARM + heartbeat.dead marker for the morning report -- a
-        # dead-and-unrecoverable run is a section-12 alarm, not something to retry into the ground.
-        # Work thoroughness (actor-critic rounds, ladder caps) is the EXECUTOR's job (section 6.2).
+        # dead-and-unrecoverable run is a human-attention alarm, not something to retry into the ground.
+        # Work thoroughness is the executor's job; the heartbeat only detects and resumes interrupted runs.
         $ledgerPath = Join-Path $cfg.run_dir 'heartbeat.resumes.json'
         $ledger = if (Test-Path $ledgerPath) { Get-Content $ledgerPath -Raw | ConvertFrom-Json }
                   else { [pscustomobject]@{ resumes = 0; resumed_from = '' } }
@@ -243,7 +288,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
             $deadReason = "runaway stop ($resumes resumes) -- progress detector is being fooled; human inspection required"
         }
         if ($deadReason) {
-            # Section 11 dead-escalation: happens ONCE (the tombstone above silences every later
+            # Recovery dead-escalation: happens ONCE (the tombstone above silences every later
             # beat), leaves the human a one-tap relaunch, and the disarm is verified.
             $relaunchPath = Join-Path $cfg.run_dir 'heartbeat.relaunch.cmd'
             $deadMsg = "Mission $runId presumed dead and unrecoverable by heartbeat: $deadReason. " +
@@ -254,15 +299,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 beat -
                 @"
 @echo off
 REM One-tap relaunch for mission $runId -- written by the heartbeat at dead-escalation
-REM (constitution section 11: heartbeat.dead + a prepared relaunch command, then stop).
+REM (constitution recovery invariant: heartbeat.dead + a prepared relaunch command, then stop).
 REM Re-fires the same headless resume the heartbeat would have run, clearing the tombstone
 REM and futility ledger for a fresh window. Safe to run more than once (spawn guard applies).
-powershell -NoProfile -ExecutionPolicy Bypass -File "$ScriptsDir\mission_heartbeat.ps1" beat -Lock "$Lock" -ForceResume
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ScriptsDir\mission_heartbeat.ps1" beat -Lock "$Lock" -ForceResume
 pause
 "@ | Set-Content -Path $relaunchPath -Encoding ASCII
             }
             $ok = $true
-            if (-not $DryRun) { $ok = Disarm-Task $taskName $runId }
+            if (-not $DryRun) { $ok = Disarm-Task $taskName $wrapperPath }
             Log "BEAT  $runId  $deadReason -> escalate ONCE (heartbeat.dead + relaunch cmd) + self-disarm $(if ($ok) {'verified'} else {'FAILED - tombstone will silence + retry next beat'})$(if ($DryRun) {' [DRY-RUN]'})"
             exit 0
         }
@@ -289,10 +334,9 @@ pause
 
         # Orientation hint -- last-step.md is an optional, advisory file the orchestrator MAY write
         # after each meaningful action ("FREEZE done, EXECUTE node 3a in flight, awaiting critic").
-        # It is NOT state -- plan.json + journal remain the source of truth per section 1.4 (memory
-        # lives on disk, re-derived). The hint just saves the resumed agent one round of grep-and-
-        # orient. Forward-compatible: absent file => no hint, current behavior unchanged. Capped at
-        # ~600 chars so a runaway append cannot pad the resume prompt.
+        # It is NOT state: plan.json + journal remain the source of truth. The hint only saves the
+        # resumed agent one round of orientation. Forward-compatible: absent file means no hint.
+        # Capped at ~600 chars so a runaway append cannot pad the resume prompt.
         $hintPath = Join-Path $cfg.run_dir 'last-step.md'
         $hint = ''
         if (Test-Path $hintPath) {
@@ -303,17 +347,20 @@ pause
             } catch { $hint = '' }
         }
 
-        $prompt = "[heartbeat] Constitution section 11 idempotent resume beat for mission run $($cfg.run_id). " +
-            "Run dir: $($cfg.run_dir). A prior orchestrator session appears dead (no activity for ${idleMin} min " +
-            "- usage window, crash, or reboot). Assess state from the run dir (plan.json, journal, partial " +
-            "artifacts) and recent commits on the mission branch.$hint Idempotency rules: (1) if the mission is " +
-            "complete or the run dir is gone, disarm via: powershell -NoProfile -ExecutionPolicy Bypass -File " +
-            "$ScriptsDir\mission_heartbeat.ps1 disarm -RunDir '$($cfg.run_dir)' and stop. (2) if the mission is " +
-            "waiting on a human gate, or a live session is actively driving this run, stop without acting. " +
-            "(3) otherwise resume from committed state; the Workflow tool is granted for this invocation " +
-            "only, so you can re-dispatch the executor on the frozen plan. From here the mission takes " +
-            "the queued shape (minor questions: assume + log; blocking-critical: push notification). " +
-            "Never lower V-class floors or skip mandated review tiers."
+        $prompt = "[heartbeat] Recovery beat for mission run $($cfg.run_id). " +
+            "Run dir: $($cfg.run_dir). A prior driver appears dead after ${idleMin} minutes without activity. " +
+            "Assess state from charter.md when present, plan.json, journal.md or journal, partial artifacts, " +
+            "witness results, and recent branch commits.$hint Before acting, load ~/.claude/docs/agent-constitution.md " +
+            "and the target repository's .mission/contract.md; if the contract is absent, stop and report an " +
+            "eligibility defect. Recovery rules: (1) if the run is complete or the run dir is gone, disarm via: " +
+            "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptsDir\mission_heartbeat.ps1 disarm " +
+            "-RunDir '$($cfg.run_dir)' and stop. (2) if the run is waiting on a human gate, or a live driver is " +
+            "active, stop without acting. (3) otherwise claim the run in mission.lock with the current CLAUDE_PID, " +
+            "process start time, and CLAUDE_CODE_SESSION_ID, then resume from frozen and committed state; do not " +
+            "repeat the grill, narrow acceptance criteria, or reinterpret silence as permission. For a mission, reconstruct " +
+            "the completed map only from committed closure evidence, run the canonical executor with args " +
+            "{ plan, completed }, consume its integrated audit, then deliver. For a loop, continue at the next " +
+            "cycle boundary."
 
         try {
             if ($transcripts.Count -gt 0) {
@@ -321,16 +368,16 @@ pause
                 Log "BEAT  $runId  stale ${idleMin}min -> resume session $sid (cwd $($cfg.cwd))$(if ($DryRun) {' [DRY-RUN]'})"
                 if (-not $DryRun) {
                     Push-Location $cfg.cwd
-                    try { claude --resume $sid -p $prompt --allowedTools "Workflow" 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
+                    try { claude --resume $sid -p $prompt --permission-mode dontAsk --allowedTools "Workflow,Read,Glob,Grep,Bash,Write,Edit" 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
                     finally { Pop-Location }
                 }
             } else {
                 # No transcript survives -- committed state in the run dir is the canonical
-                # recovery point (section 11); start fresh and let it re-orient.
+                # recovery point (recovery invariant); start fresh and let it re-orient.
                 Log "BEAT  $runId  stale ${idleMin}min, no transcript -> fresh resume (cwd $($cfg.cwd))$(if ($DryRun) {' [DRY-RUN]'})"
                 if (-not $DryRun) {
                     Push-Location $cfg.cwd
-                    try { claude -p $prompt --allowedTools "Workflow" 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
+                    try { claude -p $prompt --permission-mode dontAsk --allowedTools "Workflow,Read,Glob,Grep,Bash,Write,Edit" 2>&1 | ForEach-Object { Add-Content $LogFile "          $_" } }
                     finally { Pop-Location }
                 }
             }
@@ -342,22 +389,26 @@ pause
 
     'disarm' {
         if (-not $RunDir) { throw 'disarm requires -RunDir' }
+        $RunDir = [System.IO.Path]::GetFullPath($RunDir)
         $runId = Split-Path -Leaf $RunDir
-        $taskName = "LMO\Heartbeat-$runId"
-        $ok = Disarm-Task $taskName $runId
+        $taskName = Get-TaskName $RunDir $runId
+        $wrapperPath = Get-WrapperPath $RunDir $runId
+        $ok = Disarm-Task $taskName $wrapperPath
         Remove-Item (Join-Path $RunDir 'mission.lock') -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'heartbeat.spawning') -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'heartbeat.resumes.json') -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'heartbeat.dead') -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'heartbeat.disarmed') -ErrorAction SilentlyContinue
         Remove-Item (Join-Path $RunDir 'heartbeat.relaunch.cmd') -ErrorAction SilentlyContinue
-        Log "DISARM $runId  task removal $(if ($ok) {'verified'} else {'FAILED - TASK STILL REGISTERED (section 12 alarm): schtasks /Delete /F /TN ""$taskName"" by hand'}); lock + markers removed"
+        Log "DISARM $runId  task removal $(if ($ok) {'verified'} else {'FAILED - TASK STILL REGISTERED (human-attention alarm): schtasks /Delete /F /TN ""$taskName"" by hand'}); lock + markers removed"
     }
 
     'status' {
         if (-not $RunDir) { throw 'status requires -RunDir' }
+        $RunDir = [System.IO.Path]::GetFullPath($RunDir)
         $runId = Split-Path -Leaf $RunDir
-        schtasks /Query /TN "LMO\Heartbeat-$runId" /FO LIST 2>$null
+        $taskName = Get-TaskName $RunDir $runId
+        schtasks /Query /TN $taskName /FO LIST 2>$null
         $lockPath = Join-Path $RunDir 'mission.lock'
         if (Test-Path $lockPath) { Write-Host "--- mission.lock ---"; Get-Content $lockPath }
         else { Write-Host "no mission.lock at $lockPath" }

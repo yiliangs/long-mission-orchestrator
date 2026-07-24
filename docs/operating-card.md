@@ -1,79 +1,21 @@
 # Mission operating card
 
-The rules a **worker** (actor or critic) needs to do one node and stop. This is a distilled
-slice of `agent-constitution.md` (§6.4): the orchestrator holds the full rulebook; you carry
-this card. Consult the full constitution only if a rule here is ambiguous for your case.
+Carry only the node, frozen mission brief, relevant code, and this card.
 
-**Either role — if you lack the tool, evidence, or feasible option to do what is asked, say
-exactly that** ("cannot, because X" / `outcome:"failed"` with notes / an empty findings list).
-Always valid, always cheap. Inventing the appearance of success is the one unforgivable output.
+## Actor
 
-## If you are an ACTOR
+- Work only inside the node's instruction and write set. If the premise is false or the criterion is unreachable, return that directly; never grind or narrow done.
+- Preserve the human-only perimeter: no default-branch merge, force-push, published-history rewrite, tag, release, external communication, or blocker waiver.
+- Run the planned witness. It must exercise the property claimed. Compile or lint does not prove runtime behavior, rendered geometry, timing, or thread safety. Use a measured assertion, or set the witness status to `deferred` when its planned kind is `human-deferred`.
+- Report outcome `done` only when the witness is `passed`, or when the plan explicitly permits a `human-deferred` witness and its status is `deferred`. Include the method and concrete evidence.
+- For a mutating node, append the result to `.mission/<run-id>/journal.md` and commit the coherent code, journal entry, and witness on the mission branch. Never add AI attribution.
+- Return the files changed and commit SHA. A read-only actor returns no commit; the executor checkpoints its result before dependent work proceeds.
 
-1. **Do the node's work on the agent branch.** Commit to the agent branch. Deletions,
-   refactors, and consolidations are fine — git is the audit trail, recoverable changes are
-   not destructive. **Never** force-push, rebase/amend published branches, hard reset shared
-   state, merge to a default branch, tag/release, or do anything outward-facing (issue
-   comments, email, posting). Those are the human's, always.
-2. **V0/V1 nodes must close on a real check.** Select and RUN a concrete check (prefer a name
-   from the repo contract's verifier registry). You may report `outcome:"done"` **only if the
-   check actually passed**, and you must return its `closure_record`:
-   `{ check_command, exit_status, output_digest, artifact_digest, timestamp }` —
-   `artifact_digest` = the identity of the artifact the check observed (hash or path+size+mtime). No passing recorded check ⇒ do
-   **not** claim done — report `outcome:"failed"` with notes, or say in notes the task is
-   genuinely judgment-bound (it will be downgraded to V2 and sent to a critic). Self-report
-   never closes work. **On Windows/PowerShell, run the repo contract's verifier command
-   verbatim** — don't re-quote or translate paths; shell-quoting drift causes spurious check
-   failures. Stamp the `closure_record` timestamp with **real wall-clock time** from your
-   environment, never a placeholder. **Verify the loop before trusting it**: the check must
-   observe the artifact that ships — a green against a stale build or wrong path is no close.
-   - **The check must exercise the claim (§2.1a).** A passing check only closes the property it
-     actually observes. If you claim a property the check is *blind* to — live runtime behavior,
-     rendered geometry, thread/timing, anything the repo contract marks machine-blind (e.g. a
-     headless/webshot pass cannot see a window jump, a clipped tooltip, whether a bar is
-     concentric) — "green + looks right" is **not** a close. Either return a **measured
-     assertion** of the property itself (measure the rendered geometry, run the in-app smoke), or
-     ship `V3-deferred: <property>` in the defect ledger as an **open** item. Never report a
-     machine-blind property "done" on an eyeball.
-3. **Push your evidence.** Return the raw `git diff` of your changes and the file list —
-   reviewers judge from what you push, not by re-exploring the repo. Push the real thing.
-4. **If told to self-audit (R0):** after the check passes, stop, switch roles, and attack your
-   own diff as if an intern wrote it. Fix what you find, re-run the check, report surviving
-   concerns honestly. An empty self-audit is a claim you own. (Your closure record is the gate;
-   the self-audit is hygiene — it never substitutes for the check.)
-5. **If the node's acceptance criteria are themselves wrong** or a dependency surprise makes
-   them unreachable: `outcome:"plan_assumption_false"` with a `replan_reason`. Don't grind a
-   wrong plan. If an AC is unmeetable *as written* but the work is otherwise sound:
-   `outcome:"ac_amendment_proposed"` with `ac_amendment {ac_id, as_written, proposed, why}` —
-   never quietly narrow a criterion in prose.
+## Critic or auditor
 
-## If you are a CRITIC
+- Stay read-only unless explicitly assigned a repair node.
+- Judge the artifact against named acceptance criteria and witness evidence, not the actor's confidence.
+- Every finding cites a precise locus, the failed criterion or boundary, and the concrete consequence. No findings is valid.
+- A green witness closes only the property it actually observes. Surface machine-blind claims and human-deferred work rather than converting them into passes.
 
-1. **Find what is WRONG. Default to REJECT under uncertainty.** You see the **artifact only**,
-   not the actor's reasoning. If given a lens, apply that lens specifically.
-2. **Every finding = `{ severity, claim, evidence }`.** A finding without evidence is invalid;
-   evidence means a diff, committed artifact, or check transcript — never narrative prose.
-3. **`blocker` is valid only if it cites a named acceptance criterion or constitution clause**
-   in `cited_criterion`. An uncited blocker is discarded (demoted to major). When severity is
-   uncertain, choose **major**, not blocker — severity rounds *down* to protect the human's
-   attention.
-4. **Judge from the pushed evidence** (diff, files, check transcripts). If given a spot-check
-   budget (R2: ≤5 file reads), spend it at your own choosing to verify the most load-bearing or
-   suspicious claims — never explore open-endedly. If spec-blind (R1), the diff versus the named
-   criteria is the whole question.
-5. **Cold reviewer:** if told the artifact tentatively PASSED, judge it FRESH against the
-   criteria, blind to any prior review. If it is genuinely sound, return an **empty** findings
-   list — do not manufacture issues to seem useful.
-
-## Verification classes (who may close a task)
-
-| Class | Closes it |
-|---|---|
-| **V0** self-testable | Actor — only with a closure record |
-| **V1** machine-checkable | Harness — only with a closure record |
-| **V2** judge-checkable | Independent critic (orchestrator adjudicates) |
-| **V3** human-only | The human, always |
-
-**Round V-class UP under uncertainty** (correctness); a task between two classes takes the
-higher. Actor and critic never negotiate directly — the orchestrator rules; you get one
-evidence-based rebuttal per finding.
+If tools, evidence, or access are insufficient, say exactly what is missing. Honest inability is a valid result; simulated completion is not.

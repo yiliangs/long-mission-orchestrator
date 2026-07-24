@@ -4,8 +4,6 @@ docs/machine-profile.md
 # Python cache (scripts/ now has .py helpers)
 __pycache__/
 *.pyc
-# Mail channel secrets — the real config lives at ~/.claude/mailbridge.env, never in the repo
-mailbridge.env
 # OS noise
 .DS_Store
 Thumbs.db

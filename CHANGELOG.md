@@ -1,7 +1,35 @@
 # Changelog
 
-Notable changes to long-mission-orchestrator. The version tracks the governing constitution
-version (`docs/agent-constitution.md`). Format follows [Keep a Changelog](https://keepachangelog.com).
+Notable changes to long-mission-orchestrator. Format follows [Keep a Changelog](https://keepachangelog.com).
+
+## [1.0.0] - 2026-07-24
+
+Breaking simplification of the active mission runtime.
+
+### Changed
+- Replaced the 7,995-word V/R/M constitution with a compact cross-cutting authority.
+- Migrated plans to schema 1.0 with claim-observing `machine`, `measured`, and `human-deferred` witnesses.
+- Replaced classification, review-tier, budget, evolution, record, and mailbox machinery with a small DAG executor and one fresh final audit.
+- Restored the core lifecycle: load, grill, plan fight, freeze, recover, execute, audit, and deliver.
+- Made committed node closures the recovery source and bound resume to an explicit completed-node map.
+- Expanded the deterministic validator to enforce local `$ref`, lengths, patterns, item counts, and numeric bounds.
+- Made deployment remove retired runtime surfaces so `agent-constitution.md` is the single active authority.
+- Extracted repository mission contracts from auto-loaded `CLAUDE.md` files into the fixed `.mission/contract.md` location.
+- Reduced the constitution to non-negotiable invariants and made `skills/mission.md` the sole owner of lifecycle procedure.
+- Pruned mission contracts to checks, critical paths, machine-blind properties, and mission-only boundaries.
+- Made the plan schema the sole representation contract and the executor audit the canonical integrated audit.
+- Removed the stale machine-profile dependency from `/mission`.
+- Reconnected heartbeat recovery to the constitution, repository contract, completed-map executor call, canonical audit, and the full bounded recovery tool set.
+- Made deployment verify every copied file byte-for-byte and aligned deferred-witness and audit-finding result shapes.
+- Made schema validation fail closed for every document; removed the retired 0.1 warn-only carve-out.
+- Added committed recovery checkpoints for read-only batches so every completed node can be reconstructed without rerunning committed mutations.
+- Made heartbeat task identities repository-unique, verified Task Scheduler registration, and bound liveness to the exact driver PID and process start time.
+- Removed the unsupported POSIX deployment surface and stated the active unattended runtime's Windows requirement.
+- Added a canonical `VERSION` file and deployed version marker for 1.0.0.
+
+### Archived
+- Moved the 0.5.1 V/R/M runtime, schemas, evolution system, Codex draft, diagrams, proposals, and mailbox channel under `legacy/0.5.1/`.
+- Preserved the superseded constitution at `docs/archive/agent-constitution-v0.5.1.md`.
 
 ## [0.5.1] — 2026-07-03
 
