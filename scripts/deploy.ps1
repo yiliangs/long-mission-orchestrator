@@ -1,51 +1,69 @@
-# Deploy long-mission-orchestrator operative files into ~/.claude so Claude Code can use them.
-# The repo is the single source of truth; ~/.claude holds deployed copies.
-# EDIT IN THE REPO, THEN REDEPLOY. Never edit the ~/.claude copies directly.
+# Deploy long-mission-orchestrator operative files into ~/.claude.
+# The repository is the source of truth; ~/.claude contains deployed copies only.
 #
-#   powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+#   powershell.exe -ExecutionPolicy Bypass -File scripts\deploy.ps1
 $ErrorActionPreference = "Stop"
-$repo   = Split-Path -Parent $PSScriptRoot
+$repo = Split-Path -Parent $PSScriptRoot
 $claude = Join-Path $env:USERPROFILE ".claude"
+$version = (Get-Content (Join-Path $repo 'VERSION') -Raw).Trim()
+
+function Get-Sha256([string]$Path) {
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return [System.BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '')
+    }
+    finally {
+        $stream.Dispose()
+        $algorithm.Dispose()
+    }
+}
+
+function Copy-Verified([string]$Source, [string]$Destination) {
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force
+    if ((Get-Sha256 $Source) -ne (Get-Sha256 $Destination)) {
+        throw "Deployment verification failed: $Source -> $Destination"
+    }
+}
 
 New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$claude\workflows", "$claude\scripts" | Out-Null
 
-# Constitution + operating card + schemas + codex adapter spec -> docs/
-Copy-Item "$repo\docs\agent-constitution.md"            "$claude\docs\agent-constitution.md"            -Force
-Copy-Item "$repo\docs\operating-card.md"                "$claude\docs\operating-card.md"                -Force
-Copy-Item "$repo\schema\mission-plan.schema.json"       "$claude\docs\mission-plan.schema.json"         -Force
-Copy-Item "$repo\schema\mission-record.schema.json"     "$claude\docs\mission-record.schema.json"       -Force
-Copy-Item "$repo\schema\mission-report.schema.json"     "$claude\docs\mission-report.schema.json"       -Force
-Copy-Item "$repo\schema\cap-log.format.md"              "$claude\docs\cap-log.format.md"                -Force
-Copy-Item "$repo\executors\mission-executor.codex.md"   "$claude\docs\mission-executor.codex.md"        -Force
-Copy-Item "$repo\docs\evolve.md"                        "$claude\docs\evolve.md"                        -Force
+Copy-Verified "$repo\VERSION" "$claude\docs\lmo-version.txt"
+Copy-Verified "$repo\docs\agent-constitution.md" "$claude\docs\agent-constitution.md"
+Copy-Verified "$repo\docs\operating-card.md" "$claude\docs\operating-card.md"
+Copy-Verified "$repo\schema\mission-plan.schema.json" "$claude\docs\mission-plan.schema.json"
 
-# Skills -> commands/  (the Human's surface is two channels: email + /mission-log-audit;
-# /mission runs the work. evolve.md is an internal procedure in docs/, NOT a command.)
-Copy-Item "$repo\skills\mission.md"          "$claude\commands\mission.md"         -Force
-Copy-Item "$repo\skills\mission-loop.md"     "$claude\commands\mission-loop.md"    -Force
-Copy-Item "$repo\skills\mission-log-audit.md"   "$claude\commands\mission-log-audit.md"  -Force
-Remove-Item "$claude\commands\evolve.md" -ErrorAction SilentlyContinue   # demoted 0.3.4
+Copy-Verified "$repo\skills\mission.md" "$claude\commands\mission.md"
+Copy-Verified "$repo\skills\mission-loop.md" "$claude\commands\mission-loop.md"
+Copy-Verified "$repo\skills\mission-log-audit.md" "$claude\commands\mission-log-audit.md"
 
-# Workflow executor -> workflows/
-Copy-Item "$repo\executors\mission-executor.workflow.js" "$claude\workflows\mission-executor.workflow.js" -Force
+Copy-Verified "$repo\executors\mission-executor.workflow.js" "$claude\workflows\mission-executor.workflow.js"
 
-# Deterministic helpers -> scripts/
-Copy-Item "$repo\scripts\classify-mission.js"   "$claude\scripts\classify-mission.js"   -Force
-Copy-Item "$repo\scripts\mission_heartbeat.ps1" "$claude\scripts\mission_heartbeat.ps1" -Force
-Copy-Item "$repo\scripts\validate_record.py"    "$claude\scripts\validate_record.py"    -Force
-Copy-Item "$repo\scripts\diff_overlap.py"       "$claude\scripts\diff_overlap.py"       -Force
+Copy-Verified "$repo\scripts\mission_heartbeat.ps1" "$claude\scripts\mission_heartbeat.ps1"
+Copy-Verified "$repo\scripts\run_hidden.vbs" "$claude\scripts\run_hidden.vbs"
+Copy-Verified "$repo\scripts\validate_record.py" "$claude\scripts\validate_record.py"
 
-# Channel (§12): the shared claude-channel dispatcher owns the inbox now. LMO ships only its
-# router (invoked by the dispatcher's `route`) + its OWN app manifest. The transport
-# (channelbridge.py) is owned + deployed by the claude-channel repo; deploy that first.
-New-Item -ItemType Directory -Force -Path "$claude\channel\apps.d" | Out-Null
-Copy-Item "$repo\scripts\mission_mailbox.py"     "$claude\scripts\mission_mailbox.py"     -Force
-Copy-Item "$repo\scripts\md2html.py"             "$claude\scripts\md2html.py"             -Force
-Copy-Item "$repo\scripts\run_hidden.vbs"         "$claude\scripts\run_hidden.vbs"         -Force
-Copy-Item "$repo\channel\lmo.json"               "$claude\channel\apps.d\lmo.json"        -Force
+$obsolete = @(
+    "$claude\docs\mission-governance.md",
+    "$claude\docs\mission-record.schema.json",
+    "$claude\docs\mission-report.schema.json",
+    "$claude\docs\cap-log.format.md",
+    "$claude\docs\mission-executor.codex.md",
+    "$claude\docs\evolve.md",
+    "$claude\commands\evolve.md",
+    "$claude\scripts\classify-mission.js",
+    "$claude\scripts\diff_overlap.py",
+    "$claude\scripts\mission_mailbox.py",
+    "$claude\scripts\md2html.py",
+    "$claude\channel\apps.d\lmo.json"
+)
+foreach ($path in $obsolete) {
+    Remove-Item -LiteralPath $path -ErrorAction SilentlyContinue
+}
 
-Write-Host "Deployed long-mission-orchestrator -> $claude"
-Write-Host "  docs/      agent-constitution, schemas, codex adapter"
-Write-Host "  commands/  /mission /mission-loop /mission-log-audit  (evolve demoted to docs/ at 0.3.4)"
-Write-Host "  workflows/ mission-executor.workflow.js"
-Write-Host "  scripts/   classify-mission, mailbridge + mission_mailbox (email channel)"
+Write-Host "Deployed long-mission-orchestrator $version -> $claude"
+Write-Host "  authority   agent constitution; contracts stay in target repos"
+Write-Host "  commands    /mission /mission-loop /mission-log-audit"
+Write-Host "  runtime     plan schema + workflow executor + heartbeat"
+Write-Host "  verified    every deployed file matches its canonical source"
+Write-Host "  removed     legacy V/R/M, evolution, record, and mailbox surfaces"

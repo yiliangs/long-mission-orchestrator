@@ -1,903 +1,285 @@
-// `export const meta` is REQUIRED — do NOT reduce it to `const meta`:
-//  (1) the Workflow harness reads the exported `meta` to label/configure the run;
-//  (2) it is also what makes `node --check` (the repo contract's only JS parse gate, §8) accept
-//      this file. With the `export` present, `node --check` exits 0; remove it and the file is
-//      treated as CommonJS, where the pervasive top-level `await` below becomes a SyntaxError
-//      ("missing ) after argument list"), so the gate the executor node closes on FAILS.
-// The v0.3.6 tier012 mission stripped this `export` and self-certified the parse gate green — a
-// false close (§2.1, the §2.3a correlated-self-verify trap). Restored here. The harness wraps the
-// body in an async function at runtime, which is why the top-level `await`/`return` are legal
-// there; both are load-bearing — do not "simplify" them away.
 export const meta = {
   name: 'mission-executor',
-  description: 'Claude Code executor adapter: walks a frozen plan.json DAG — fan-out, R-tier review gating, mission budget, problem-solving ladder, subtree replan — per the agent constitution.',
+  description: 'Walk a frozen mission DAG, run claim-observing witnesses, and audit the integrated result',
   phases: [
-    { title: 'Execute' },
-    { title: 'Audit' },
+    { title: 'Execute', detail: 'run ready mission nodes and record evidence' },
+    { title: 'Audit', detail: 'check the integrated artifact against mission acceptance criteria' },
   ],
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SUBSTRATE BINDING for the mission protocol (constitution §10).
-//
-// This script is ONE executor of the harness-neutral plan.json spec. It contains
-// no policy — policy lives in agent-constitution.md. It only *walks the DAG*.
-// A Codex adapter walks the same plan.json differently; the plan does not care.
-//
-// INPUT: `args` is the plan.json object — OR a JSON string of it. The Workflow
-//        sandbox has no FS access, so /mission reads the file and passes the
-//        contents in (not the path). Workflow `args` is passed verbatim, so a
-//        stringified plan arrives as one string; it is parsed defensively below.
-//        Spawned agents DO have tool access and read the repo / operating card /
-//        node files themselves.
-//
-// RESUME: node-granular. `args.completed` (optional) is a map of nodeId -> result
-//        from a prior interrupted run; those nodes are skipped. The DAG is the
-//        journal at node granularity (constitution §10).
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Defensive arg parse: the documented contract is a parsed object, but a stringified plan
-// reaches the script as one JSON string (Workflow `args` is verbatim). The first daylight
-// mission hit exactly this — the canonical executor crashed on string args and had to be
-// hand-patched mid-run. Accept both shapes so a producer-side contract slip can never crash
-// the walk.
-const _args = typeof args === 'string' ? JSON.parse(args) : args
-const plan = _args
-const completed = (_args && _args.completed) || {}
-
-const C = plan.constitution_version || 'unknown'
-const REPO = plan.repo
-const MODE = plan.mode
-const ZONES = plan.deliverable_zones || []
-// Orchestration depth (§2.4). BACKSTOP for the deterministic classifier (scripts/classify-mission.js,
-// run at PLAN): re-derive the class FLOOR here so a hand-edited or under-classified plan cannot make
-// the executor's own decisions (audit depth) run below what the plan's facts permit. The planner may
-// raise above the floor, never below it. Discrepancy is logged for the report.
-const _V = { V0: 0, V1: 1, V2: 2, V3: 3 }, _CEREMONY = { M0: 0, M1: 1, M2: 2 }
-// Glob-vs-glob overlap for write_set/zone comparisons (§6.5, §2.4). Substring matching missed
-// e.g. write_set "src/**/*.cs" vs zone "src/ui/" (a silent V2-floor bypass — ex-audit 2026-06-12).
-// Literal paths overlap iff equal or one dir-prefixes the other; wildcards compare their static
-// directory prefixes. Errs toward overlap: a false hit RAISES ceremony, never lowers it.
-function _globOverlap(a, b) {
-  const norm = s => String(s).replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '')
-  const wild = s => /[*?]/.test(s)
-  const stat = s => { const i = s.search(/[*?]/); const pre = s.slice(0, i); return pre.slice(0, pre.lastIndexOf('/') + 1) }
-  const x = norm(a), y = norm(b)
-  if (!wild(x) && !wild(y)) return x === y || x.startsWith(y + '/') || y.startsWith(x + '/')
-  const px = wild(x) ? stat(x) : x + '/', py = wild(y) ? stat(y) : y + '/'
-  return px.startsWith(py) || py.startsWith(px)
-}
-function _classFloor(p) {
-  const ns = (p && p.nodes) || []; if (!ns.length) return 'M1'
-  const vMax = ns.reduce((m, n) => Math.max(m, _V[n.v_class] != null ? _V[n.v_class] : 2), 0)
-  const zones = (p && p.deliverable_zones) || []
-  const touchesZone = ns.some(n => Array.isArray(n.write_set) &&
-    n.write_set.some(w => zones.some(z => _globOverlap(w, z))))
-  const unknownReach = ns.some(n => !Array.isArray(n.write_set))
-  if (vMax >= _V.V3) return 'M2'
-  return (ns.length <= 2 && vMax <= _V.V1 && !touchesZone && !unknownReach) ? 'M0' : 'M1'
-}
-const _claimedClass = plan.mission_class || 'M1'
-const _floorClass = _classFloor(plan)
-const MCLASS = (_CEREMONY[_claimedClass] != null ? _CEREMONY[_claimedClass] : 1) >= _CEREMONY[_floorClass]
-  ? _claimedClass : _floorClass
-
-// Default caps (constitution §6.2). Per-node overrides live on node.caps.
-const DEFAULT_CAPS = {
-  micro_loop_retries: 3,
-  sub_loop_iterations: 5,
-  subtree_replans: 2,
-  cold_swaps: 1,            // §3.4 cold-reviewer rotation; evolution-tuned
-  gate_fix_cycles: 2,       // §6.1 tier 2: capped revise→re-review→re-adjudicate at the gate (≤2)
-}
-
-// ── Mission budget (§6.4, v0.4.2 semantics): dual ESTIMATE frozen at PLAN ────
-// budget.spent() counts OUTPUT tokens across the turn — an honest proxy; the cumulative
-// cache-read drain is not observable mid-run. AMENDED per human directive (2026-07-03, after
-// the salary-atlas run diverged at 2M with the deliverable tail unopened): the budget is an
-// ESTIMATE and a reporting tripwire, NOT a kill-switch. An overrun never halts the mission
-// and never sheds quality passes — the run keeps going and the overrun is MARKED in the final
-// results (mission-level cap_hit + budget.overrun + a report line). Runaway protection is
-// §6.3 progress-based divergence plus the harness's absolute agent cap, not this number.
-// A budget still never skips a gate or lowers a floor.
-const TOKEN_BUDGET = plan.token_budget || null
-const AGENT_BUDGET = plan.agent_budget || null
-const _startSpent = budget.spent()
-let _agentsSpawned = 0
-function tokensUsed() { return budget.spent() - _startSpent }
-function budgetOverrun() {
-  return (TOKEN_BUDGET != null && tokensUsed() >= TOKEN_BUDGET) ||
-         (AGENT_BUDGET != null && _agentsSpawned >= AGENT_BUDGET)
-}
-// Every spawn goes through here so planned-vs-actual lands in the run-record (§7).
-// An overrun is sanctioned (§6.4 v0.4.2: the run continues) but NEVER silent: logged here and
-// recorded as a mission-level cap_hit in budgetReport() — a breach that exists only as prose
-// is invisible to §7 calibration.
-function spawn(prompt, opts) {
-  _agentsSpawned++
-  if (AGENT_BUDGET != null && _agentsSpawned === AGENT_BUDGET + 1)
-    log(`⚠ Agent estimate overrun (${_agentsSpawned}/${AGENT_BUDGET}) — run continues (§6.4 v0.4.2); overrun lands in cap_hits + final report.`)
-  return agent(prompt, opts)
-}
-
-// ── Review tiers (§3.1): V→R floors, planner discretion above ────────────────
-const _R = { R0: 0, R1: 1, R2: 2, R3: 3 }
-function reviewFloor(node, selfClosed) {
-  if (node.is_final_deliverable) return 'R3'
-  const touchesZone = Array.isArray(node.write_set) &&
-    node.write_set.some(w => ZONES.some(z => _globOverlap(w, z)))
-  if (node.v_class === 'V2' || node.v_class === 'V3' || touchesZone) return 'R2'
-  if (!selfClosed) return 'R2'      // V0/V1 with no closure record downgrades to V2 (§2.1)
-  return 'R0'                       // the recorded check is the gate; R0 is hygiene on top
-}
-function effectiveTier(node, selfClosed) {
-  let floor = reviewFloor(node, selfClosed)
-  // Legacy compat: ac_required=true with no explicit review_tier keeps its fresh critic.
-  if (!node.review_tier && node.ac_required && _R[floor] < _R.R2) floor = 'R2'
-  const planned = node.review_tier
-  if (planned && _R[planned] != null) {
-    if (_R[planned] >= _R[floor]) return planned
-    log(`⚠ Node ${node.id}: review_tier ${planned} below floor ${floor} — floored (§3.1).`)
-  }
-  return floor
-}
-
-// ── Compute tier (§3.6): model intelligence tracks stake of judgement ─────────
-// The strongest model is the default; a weaker one is permitted only where a wrong answer has
-// NO UNCAUGHT consequence. Tier is per ROLE, not per node — gates are always Opus (the model is
-// the gate); a V0/V1 actor descends (the binding check, not the model, defines correctness); the
-// advisory improver descends (the gate that follows it catches a bad suggestion). Haiku is opt-in
-// with a rationale, never derived. When the call is blurry, round UP.
-const _M = { haiku: 0, sonnet: 1, opus: 2 }
-const _MNAME = ['haiku', 'sonnet', 'opus']
-
-// Lowest tier permitted for the ACTOR side (actor / retry / revise) of a node.
-function actorModelFloor(node) {
-  if (node.is_final_deliverable) return 'opus'                       // outward, last line
-  if (node.v_class === 'V2' || node.v_class === 'V3') return 'opus'  // §2.3: correctness exceeds any check
-  return 'sonnet'                                                    // V0/V1 binding closure record (§2.1) is the gate
-}
-// Resolve the actor model: planner may raise toward Opus, never below the floor. Haiku honored
-// ONLY on a Sonnet-floor (V0/V1) node carrying an explicit rationale (§3.6 opt-in); else round up.
-function actorModel(node) {
-  const floor = actorModelFloor(node)
-  const req = node.model_tier
-  if (!req || _M[req] == null) return floor
-  if (_M[req] >= _M[floor]) return req                              // at/above floor (e.g. Opus on a V0 node)
-  if (req === 'haiku' && floor === 'sonnet' && node.model_rationale) return 'haiku'  // justified pure-transport
-  log(`⚠ Node ${node.id}: model_tier ${req} below floor ${floor}` +
-    `${req === 'haiku' ? ' (Haiku needs model_rationale on a V0/V1 actor)' : ''} — rounded up to ${floor} (§3.6).`)
-  return floor
-}
-// A failed V0/V1 close rounds the retry up one tier — the cheap model could not satisfy the
-// binding check, which is the signal to spend more (§3.6 round-up at the retry edge).
-function retryModel(base, tries) { return _MNAME[Math.min(_M.opus, _M[base] + tries)] }
-
-// Planned actor-tier histogram for the go-gate + run-record (§3.6/§7). Gates are Opus by rule.
-function modelReport() {
-  const actor_tier_histogram = {}
-  for (const n of plan.nodes) { const m = actorModel(n); actor_tier_histogram[m] = (actor_tier_histogram[m] || 0) + 1 }
-  return { actor_tier_histogram, gates: 'opus (§3.6)' }
-}
-
-// ── Structured-output schemas ────────────────────────────────────────────────
-
-const ACTOR_SCHEMA = {
+const NODE_RESULT = {
   type: 'object',
-  required: ['outcome', 'artifact_summary'],
+  required: ['outcome', 'summary', 'files_changed', 'witness', 'commit_sha', 'notes'],
   additionalProperties: false,
   properties: {
-    outcome: { enum: ['done', 'plan_assumption_false', 'ac_amendment_proposed', 'failed'] },
-    artifact_summary: { type: 'string' },
-    // Pushed evidence (§6.4 context discipline): reviewers judge from this, not from
-    // re-exploring the repo. The raw diff is what an R1/R2 critic reads in full.
-    diff: { type: ['string', 'null'], description: 'git diff of this node\'s changes on the agent branch (raw, untruncated unless enormous — then the full diff of the most material files + a stat summary).' },
-    files_touched: { type: ['array', 'null'], items: { type: 'string' } },
-    // Present only for V0/V1 nodes that self-closed (constitution §2.1).
-    closure_record: {
-      type: ['object', 'null'],
+    outcome: { enum: ['done', 'blocked', 'plan_assumption_false', 'failed'] },
+    summary: { type: 'string' },
+    files_changed: { type: 'array', items: { type: 'string' } },
+    witness: {
+      type: 'object',
+      required: ['status', 'method', 'evidence'],
+      additionalProperties: false,
       properties: {
-        check_command: { type: 'string' },
-        check_source: { enum: ['registry', 'ad-hoc'], description: 'registry = named in the repo contract verifier registry; ad-hoc = composed for this node. Ad-hoc closures are force-included in the AUDIT sample (§2.1).' },
-        exit_status: { type: 'integer' },
-        output_digest: { type: 'string' },
-        artifact_digest: { type: ['string', 'null'], description: 'Identity of the artifact the check actually observed (content hash, or built-output path+size+mtime). Rung 0 (§6.1): binds the check to what ships — an unchanged digest across retries is a disconnected oracle.' },
-        timestamp: { type: 'string' },
+        status: { enum: ['passed', 'failed', 'deferred'] },
+        method: { type: 'string' },
+        evidence: { type: 'string' },
       },
     },
-    // R0 only: surviving concerns from the adversarial self-audit phase (§3.1).
-    self_audit: { type: ['string', 'null'] },
-    // Set when outcome === 'plan_assumption_false'.
-    replan_reason: { type: ['string', 'null'] },
-    // Set when outcome === 'ac_amendment_proposed' (§6.1 anti-goal-erosion): the work is sound
-    // but an AC is unmeetable as written — propose the honest amendment, never quietly narrow.
-    ac_amendment: {
-      type: ['object', 'null'],
-      properties: {
-        ac_id: { type: 'string' },
-        as_written: { type: 'string' },
-        proposed: { type: 'string' },
-        why: { type: 'string' },
-      },
-    },
-    notes: { type: ['string', 'null'] },
+    commit_sha: { type: ['string', 'null'], pattern: '^[0-9a-fA-F]{7,64}$' },
+    notes: { type: 'string' },
   },
 }
 
-const CRITIC_SCHEMA = {
+const CHECKPOINT_RESULT = {
   type: 'object',
-  required: ['findings'],
+  required: ['commit_sha', 'summary'],
   additionalProperties: false,
   properties: {
+    commit_sha: { type: 'string', pattern: '^[0-9a-fA-F]{7,64}$' },
+    summary: { type: 'string' },
+  },
+}
+
+const AUDIT_RESULT = {
+  type: 'object',
+  required: ['status', 'findings', 'human_deferred', 'summary'],
+  additionalProperties: false,
+  properties: {
+    status: { enum: ['passed', 'failed', 'human_required'] },
     findings: {
       type: 'array',
       items: {
         type: 'object',
-        required: ['severity', 'claim', 'evidence'],
+        required: ['locus', 'criterion', 'evidence', 'consequence', 'recommendation'],
         additionalProperties: false,
         properties: {
-          severity: { enum: ['blocker', 'major', 'minor'] },
-          claim: { type: 'string' },
+          locus: { type: 'string' },
+          criterion: { type: 'string' },
           evidence: { type: 'string' },
-          // Blockers are INVALID without a cited criterion/clause (§3.3).
-          cited_criterion: { type: ['string', 'null'] },
-          suggested_fix: { type: ['string', 'null'] },
+          consequence: { type: 'string' },
+          recommendation: { type: 'string' },
         },
       },
     },
+    human_deferred: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'string' },
   },
 }
 
-const AUDIT_SCHEMA = {
-  type: 'object',
-  required: ['verdict', 'rechecked', 'punchlist', 'ledger'],
-  additionalProperties: false,
-  properties: {
-    verdict: { enum: ['DELIVERED', 'DIVERGED'] },
-    rechecked: { type: 'string', description: 'Summary of re-running all recorded checks + sampled self-closures.' },
-    punchlist: { type: 'array', items: { type: 'string' } },
-    ledger: { type: 'array', items: { type: 'string' } },
-  },
+const raw = typeof args === 'string' ? JSON.parse(args) : args
+const plan = raw && raw.plan ? raw.plan : raw
+const completed = { ...((raw && raw.completed) || {}) }
+
+function assertPlan(p) {
+  if (!p || p.schema_version !== '1.0') throw new Error('mission plan schema_version must be 1.0')
+  for (const key of ['run_id', 'goal', 'repo', 'mode', 'branch']) {
+    if (!p[key]) throw new Error(`mission plan missing ${key}`)
+  }
+  if (!Array.isArray(p.acceptance_criteria) || !p.acceptance_criteria.length) {
+    throw new Error('mission plan needs acceptance_criteria')
+  }
+  if (!Array.isArray(p.nodes) || !p.nodes.length) throw new Error('mission plan needs nodes')
+  const ids = new Set()
+  for (const node of p.nodes) {
+    if (!node.id || ids.has(node.id)) throw new Error(`invalid or duplicate node id: ${node.id}`)
+    ids.add(node.id)
+    for (const key of ['title', 'instruction', 'deps', 'parallelizable', 'write_set', 'acceptance_criteria', 'witness']) {
+      if (node[key] === undefined) throw new Error(`node ${node.id} missing ${key}`)
+    }
+  }
+  for (const node of p.nodes) {
+    for (const dep of node.deps) if (!ids.has(dep)) throw new Error(`node ${node.id} has unknown dep ${dep}`)
+  }
 }
 
-// ── Prompt builders ──────────────────────────────────────────────────────────
-
-// Canonical context pack (§6.4 cache-prefix discipline). Workers carry the distilled operating
-// card, NOT the full constitution: fresh context means re-derived state, not re-read governance.
-// This block is BYTE-IDENTICAL and sits at the TOP of every spawn's prompt, so every agent after
-// the first hits the prompt cache instead of paying fresh input — "spawn a bunch and each one
-// reads from the start" is the dominant fan-out cost, and this is its antidote. Node-specific
-// material always comes AFTER this shared prefix. Context is pushed, never pulled.
-const govern = `=== MISSION CONTEXT (shared, identical for every agent in this run) ===
-You operate under the mission operating card ~/.claude/docs/operating-card.md (constitution
-version ${C}; consult the full ~/.claude/docs/agent-constitution.md only if a rule is ambiguous).
-Mission ${plan.run_id} (class ${MCLASS}, mode ${MODE}) — goal: ${plan.goal}
-Repo: ${REPO}. Deliverable zones (V2 floor): ${JSON.stringify(ZONES)}.
-Plan: ${plan.nodes.map(n => `[${n.id}] ${n.title} (${n.v_class})`).join(' · ')}
-If you lack the tool, evidence, or feasible option to do what is asked, SAY EXACTLY THAT as
-your output ("cannot, because X" / outcome=failed with notes / an empty findings list) — always
-a valid, cheap deliverable. Inventing the appearance of success is the one unforgivable output.
-=== END MISSION CONTEXT ===`
+function assertCompleted(p, done) {
+  const nodes = new Map(p.nodes.map(node => [node.id, node]))
+  for (const [id, result] of Object.entries(done)) {
+    const node = nodes.get(id)
+    if (!node) throw new Error(`completed map contains unknown node ${id}`)
+    if (!result || result.outcome !== 'done') throw new Error(`completed node ${id} lacks a done result`)
+    for (const dep of node.deps) {
+      if (!done[dep]) throw new Error(`completed map is not dependency-closed: ${id} lacks ${dep}`)
+    }
+    const expected = node.witness.kind === 'human-deferred' ? 'deferred' : 'passed'
+    if (!result.witness || result.witness.status !== expected) {
+      throw new Error(`completed node ${id} lacks its expected ${expected} witness`)
+    }
+    if (!/^[0-9a-fA-F]{7,64}$/.test(result.commit_sha || '')) {
+      throw new Error(`completed node ${id} lacks a valid recovery commit SHA`)
+    }
+  }
+}
 
 function actorPrompt(node) {
-  // R0 (§3.1): adversarial self-audit rides the actor's own cached context — a second phase in
-  // the SAME conversation, zero re-reading. Permitted as hygiene only where the V0/V1 closure
-  // record is the real gate; if the check doesn't pass, the tier floors to R2 and a fresh
-  // critic fires anyway (effectiveTier).
-  const r0Phase = node.review_tier === 'R0' ? `
-- AFTER the work passes its check: STOP. Switch roles. Re-read your own diff as an adversarial
-  reviewer who assumes it was written by an intern — hunt for what is wrong, fragile, or missed,
-  not for reassurance. Fix what you find, re-run the check, and report any SURVIVING concerns
-  honestly in self_audit (empty self_audit = "I attacked it and found nothing", a claim you own).` : ''
-  return `${govern}
+  const mutable = node.write_set.length > 0
+  return `You are the actor for one frozen mission node.
 
-TASK NODE [${node.id}] ${node.title} (verification class ${node.v_class})
-INSTRUCTION: ${node.instruction || node.title}
-ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
+MISSION: ${plan.goal}
+REPOSITORY: ${plan.repo}
+BRANCH: ${plan.branch}
+RUN ID: ${plan.run_id}
+BOUNDARIES: ${JSON.stringify(plan.boundaries || [])}
+NODE: ${node.id} - ${node.title}
+OWNER: ${node.owner || 'derive from the task'}
+INSTRUCTION: ${node.instruction}
+DEPENDENCIES: ${JSON.stringify(node.deps)}
+WRITE SET: ${JSON.stringify(node.write_set)}
+ACCEPTANCE CRITERIA: ${JSON.stringify(node.acceptance_criteria)}
+WITNESS CLAIM: ${node.witness.claim}
+WITNESS KIND: ${node.witness.kind}
+WITNESS METHOD: ${node.witness.method}
 
-Do the work on the agent branch. Then:
-- If this node is V0/V1: SELECT and RUN a concrete check (prefer a name from the repo
-  contract's verifier registry; "${node.check || 'TBD'}" is a suggestion only). You may
-  only report outcome="done" if the check actually passed — return its closure_record
-  {check_command, check_source, exit_status, output_digest, artifact_digest, timestamp}.
-  VERIFY THE LOOP FIRST (§6.1 rung 0): confirm the check observes the artifact that ships
-  (fresh build, right path) and put that artifact's identity (hash, or path+size+mtime) in
-  artifact_digest — a green against a stale build or wrong path is no close. check_source is
-  "registry" ONLY if the command is one named in the repo contract's verifier registry;
-  anything you composed yourself is "ad-hoc" (ad-hoc closures are force-audited — mislabeling
-  is itself an audit finding). The timestamp MUST be the real
-  wall-clock time from your environment, never a placeholder like 00:00:00Z. No passing recorded check ⇒ do
-  NOT claim done; report outcome="failed" with notes, OR if the task is genuinely
-  judgment-bound, say so in notes (it will be downgraded to V2).${r0Phase}
-- Return PUSHED EVIDENCE for review: the raw git diff of your changes in "diff" and the file
-  list in "files_touched" — reviewers judge from what you push, so push the real thing.
-- If you discover the node's acceptance criteria are themselves wrong / a dependency
-  surprise makes them unreachable: outcome="plan_assumption_false" with replan_reason.
-- If an acceptance criterion is unmeetable AS WRITTEN but the work is otherwise sound and an
-  honest narrower criterion exists: outcome="ac_amendment_proposed" with ac_amendment
-  {ac_id, as_written, proposed, why}. NEVER quietly narrow a criterion in prose — an unstated
-  narrowing is goal erosion (§6.1).
-- Commit to the agent branch. Deletions/refactors are fine (git is the audit trail). Never force-push, rebase/amend published, merge to default, or act outward.`
+Read ~/.claude/docs/operating-card.md and follow it. Work only inside the node scope. Run the witness and report concrete evidence. A witness must exercise the claimed property. If the premise is false, return plan_assumption_false rather than improvising a new goal.
+
+${mutable ? `After the witness passes, append this node's result to .mission/${plan.run_id}/journal.md and commit the coherent code, journal entry, and witness on ${plan.branch}. Never add AI attribution. Return the commit SHA.` : 'This node is read-only. Do not modify files or create a commit.'}
+
+Your structured result is the complete node result.`
 }
 
-// Shared closing contract for every gating critic (§3.3).
-const criticRules = `Return findings. Each finding needs {severity, claim, evidence}. A "blocker" is ONLY valid
-if it cites a specific named acceptance criterion or constitution clause in cited_criterion
-— an uncited blocker is invalid and will be discarded. When severity is uncertain, choose
-"major", not "blocker".`
+function checkpointPrompt(results) {
+  return `You are the recovery-state writer for a completed read-only mission batch.
 
-// R1 (§3.1): spec-blind diff review. The critic sees the node contract and the RAW DIFF —
-// deliberately NOT the actor's narrative — so it judges whether the diff satisfies the
-// contract without inheriting the actor's frame. No repo access; the diff is the artifact.
-function r1CriticPrompt(node, actor) {
-  return `${govern}
+REPOSITORY: ${plan.repo}
+BRANCH: ${plan.branch}
+RUN ID: ${plan.run_id}
+NODE RESULTS: ${JSON.stringify(results)}
 
-You are an ADVERSARIAL CRITIC doing a SPEC-BLIND DIFF REVIEW, defaulting to REJECT under
-uncertainty. You see the node contract and the raw diff ONLY — no author narrative, by design.
-Judge ONE question: does this diff satisfy the named acceptance criteria, without collateral
-damage visible in the diff itself? Do not explore the repo.
-
-TASK NODE [${node.id}] ${node.title}
-ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
-FILES TOUCHED: ${JSON.stringify(actor.files_touched || null)}
-RAW DIFF UNDER REVIEW:
-${actor.diff || '(actor pushed no diff — treat that itself as a major finding)'}
-
-${criticRules}`
+Do not modify deliverable files. For each result, write .mission/${plan.run_id}/nodes/<node-id>.json containing the complete result, append a concise closure entry to .mission/${plan.run_id}/journal.md, and commit only those recovery artifacts on ${plan.branch}. Never add AI attribution. Return the commit SHA.`
 }
 
-// R2 (§3.1): cold-eye review of pushed evidence + a bounded independent spot-check. The actor
-// never knows WHICH claims get verified, so all claims must be honest — trust-but-verify with
-// unpredictable sampling, at a fixed cost instead of open-ended re-exploration.
-function r2CriticPrompt(node, actor, lens) {
-  return `${govern}
-
-You are an ADVERSARIAL CRITIC. Your job is to find what is WRONG with the work below,
-defaulting to REJECT under uncertainty. You see the actor's pushed evidence — summary, diff,
-files — but NOT its reasoning. ${lens ? `Apply specifically the ${lens} lens.` : ''}
-You have a SPOT-CHECK BUDGET of at most 5 file reads in the repo: spend them at YOUR OWN
-choosing to independently verify the claims you find most load-bearing or most suspicious
-(callers of changed code, conventions, a test the actor claims passes). Do NOT explore
-open-endedly; reads beyond verifying a specific claim are waste.
-
-TASK NODE [${node.id}] ${node.title}
-ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
-ACTOR SUMMARY: ${actor.artifact_summary}
-FILES TOUCHED: ${JSON.stringify(actor.files_touched || null)}
-DIFF:
-${actor.diff || '(actor pushed no diff — treat that itself as a major finding)'}
-
-${criticRules}`
+function isReady(node, pending) {
+  return node.deps.every(dep => completed[dep] && !pending.has(dep))
 }
 
-// Cold reviewer (§3.4): fresh eyes on an artifact that tentatively PASSED, blind to the
-// prior review. Both staleness-breaker and disambiguator of genuine-vs-stale convergence.
-function coldCriticPrompt(node, artifact) {
-  return `${govern}
+assertPlan(plan)
+assertCompleted(plan, completed)
+const pending = new Map(plan.nodes.filter(n => !completed[n.id]).map(n => [n.id, n]))
+const orderedIds = plan.nodes.map(n => n.id)
 
-You are a COLD reviewer. This artifact has tentatively PASSED review — your job is to find
-what a reviewer who had stared at it for several rounds would have stopped noticing. You have
-NO knowledge of the prior review (no verdicts, no debate); judge it FRESH against the
-objective criteria only, defaulting to REJECT under uncertainty.
-
-TASK NODE [${node.id}] ${node.title}
-ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
-ARTIFACT UNDER REVIEW:
-${artifact}
-
-Return findings ({severity, claim, evidence}; a "blocker" needs a cited named criterion in
-cited_criterion or it is discarded). If the artifact is genuinely sound, return an EMPTY
-findings list — do NOT manufacture issues to seem useful.`
-}
-
-// Cold-IMPROVER (§3.4): distinct from the cold VERIFIER above. Fresh independent eyes on a
-// FIRST-DRAFT artifact whose job is to make it STRONGER — advisory, not a gate. It ALWAYS
-// engages (no "return empty if sound" off-switch) and inspects the real changes on the agent
-// branch, not a summary. This is the high-yield position for cold review: fresh drafts, not
-// the already-scrubbed final deliverable. A quality lever ([model]); never closes a gate.
-function improverPrompt(node, artifact) {
-  // improve_stance "refute" (§3.5 / plan flag): on approach-bearing nodes the improver attacks
-  // the APPROACH at draft time — the only position in the whole pipeline where a thinking error
-  // is still cheap to change (post-freeze gates only ever catch execution errors, per corpus).
-  const job = node.improve_stance === 'refute'
-    ? `Your job is to attack the APPROACH while it is still cheap to change: is this the right
-way to solve this node at all? Hunt design errors, wrong assumptions, missing cases, and
-simpler-or-sounder alternatives — not polish.`
-    : `Your job is to make it STRONGER: surface concrete, specific improvements and anything
-wrong, risky, or missed.`
-  return `${govern}
-
-You are an independent reviewer seeing this work COLD — fresh eyes, no knowledge of how it was
-produced. ${job} INSPECT THE ACTUAL CHANGES on the agent branch (read the files / git
-diff) — do not judge from the summary alone. You do NOT need to find a blocker to be useful;
-well-grounded partial suggestions are the point. Avoid vague style nits — every finding must be
-actionable and cite file:line evidence.
-
-TASK NODE [${node.id}] ${node.title}
-ACCEPTANCE CRITERIA (named): ${JSON.stringify(node.acceptance_criteria)}
-ARTIFACT (first draft) UNDER REVIEW:
-${artifact}
-
-Return findings; each = {severity, claim, evidence, suggested_fix}. These are SUGGESTIONS to
-the author, not gate verdicts.`
-}
-
-// Actor REVISION (§3.3): the author receives independent review and revises with its OWN
-// judgment — adopt what is valid, rebut what is not. Closes the review→revise loop the
-// executor previously lacked. Reuses actorPrompt so the full task contract still binds.
-function reviseActorPrompt(node, findings) {
-  return `${actorPrompt(node)}
-
-INDEPENDENT EXTERNAL REVIEW of your first draft is below. Take it with your own judgment: adopt
-every point that genuinely improves the work, and rebut — with evidence — any you think is wrong
-or out of scope. You are NOT obligated to accept all of it. Apply the accepted changes on the
-agent branch; if this node is V0/V1, RE-RUN the check and return a fresh closure_record. Return
-the REVISED artifact, and in notes say briefly what you took, what you rejected, and why.
-
-EXTERNAL REVIEW (${findings.length} item(s)):
-${JSON.stringify(findings, null, 2)}`
-}
-
-// ── Adjudication (orchestrator rules; §3.3) ──────────────────────────────────
-// A blocker's citation must RESOLVE, not merely exist: a constitution clause (§N.N) or one of
-// the node's named acceptance criteria. Presence-only checking let a confabulated citation
-// through (ex-audit 2026-06-12); resolution is deterministic, so it is checked here, not asked.
-function _citationResolves(cited, node) {
-  if (!cited) return false
-  if (/§\s*\d/.test(cited)) return true
-  const c = String(cited).toLowerCase()
-  return ((node && node.acceptance_criteria) || []).some(ac => {
-    const a = String(ac).toLowerCase()
-    const name = a.split(':')[0].trim()
-    return a.includes(c) || c.includes(a) || (name.length >= 4 && c.includes(name))
-  })
-}
-// Returns { blockers, majors, minors } after discarding invalid findings.
-function adjudicate(findingSets, node) {
-  const all = findingSets.filter(Boolean).flatMap(f => f.findings || [])
-  const cites = f => _citationResolves(f.cited_criterion, node)
-  const blockers = all.filter(f => f.severity === 'blocker' && cites(f))  // unresolved citation = invalid
-  const majors = all.filter(f => f.severity === 'major' ||
-    (f.severity === 'blocker' && !cites(f)))                              // demote: uncited OR non-resolving
-  const minors = all.filter(f => f.severity === 'minor')
-  return { blockers, majors, minors }
-}
-
-function capFor(node, key) {
-  return (node.caps && node.caps[key] != null) ? node.caps[key] : DEFAULT_CAPS[key]
-}
-
-// ── write_set conformance (§6.5, deterministic — no model call) ──────────────
-// The executor RECORDS write_set breaches to the defect ledger as a MINOR finding (advisory in
-// the serial-only era, constitution v0.3.7). Rationale: until worktree fan-out for mutating
-// nodes is wired (§6.5 above), the parallel-safety derivation the write_set protected is not
-// yet load-bearing, and 9/14 corpus missions produced rubber-stamped benign-bleed waivers — a
-// gate guarding nothing. The check still runs and the breach is recorded (silent-accept ban
-// preserved), but it does NOT escalate to the Human. When worktree-isolated fan-out for mutating
-// nodes lands, change the returned severity back to 'blocker' — parallelism is what makes a
-// breach a real safety hazard, and the gate returns with the safety it protects.
-function _writeSetMatch(file, entry) {
-  let f = file.replace(/\\/g, '/').replace(/^\.\//, '')
-  // Relativize an absolute touched path to repo-root so it can match a repo-relative write_set
-  // entry. Actors report absolute paths on Windows; comparing those against a relative
-  // declaration produced two false breaches in mission tier012-20260612 (path-normalization gap).
-  const _root = String(REPO || '').replace(/\\/g, '/').replace(/\/$/, '')
-  if (_root) { const lf = f.toLowerCase(), lr = _root.toLowerCase()
-    if (lf === lr || lf.startsWith(lr + '/')) f = f.slice(_root.length).replace(/^\//, '') }
-  const e = entry.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '')
-  if (f === e || f.startsWith(e + '/')) return true                 // exact file or directory prefix
-  if (e.includes('*')) {                                            // glob: ** crosses /, * does not
-    const rx = new RegExp('^' + e.replace(/[.+^${}()|[\]]/g, '\\$&')
-      .replace(/\*\*/g, ' ').replace(/\*/g, '[^/]*').replace(/ /g, '.*') + '$')
-    return rx.test(f)
-  }
-  return false
-}
-function writeSetBreach(node, actor) {
-  if (!Array.isArray(node.write_set) || node.write_set.length === 0) return null
-  const fromDiff = (actor.diff || '').split('\n')
-    .filter(l => l.startsWith('+++ b/')).map(l => l.slice(6).trim())
-  const touched = [...new Set([...(actor.files_touched || []), ...fromDiff])]
-    .filter(f => f && f !== '/dev/null')
-  const outside = touched.filter(f => !node.write_set.some(e => _writeSetMatch(f, e)))
-  if (!outside.length) return null
-  return {
-    severity: 'minor',
-    claim: `write_set breach: node declared ${JSON.stringify(node.write_set)} but touched ${JSON.stringify(outside)}`,
-    evidence: 'deterministic diff-vs-declaration check (logged advisory, serial-only era)',
-    cited_criterion: '§6.5 write_set declaration (advisory pending worktree fan-out)',
-    suggested_fix: 'widen the declaration on the next replan if this pattern recurs; no gate action',
-  }
-}
-
-function isReady(node, doneSet) {
-  return (node.deps || []).every(d => doneSet.has(d))
-}
-
-// ── Execute one node: actor + (micro-loop) + critic gate ─────────────────────
-async function runNode(node) {
-  if (completed[node.id]) return completed[node.id]
-
-  const aModel = actorModel(node)   // compute tier for this node's actor side (§3.6)
-  let actor = await spawn(actorPrompt(node), {
-    label: `actor:${node.id}@${aModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: aModel,
-  })
-  if (!actor) return { node: node.id, status: 'lost', reason: 'actor died' }
-
-  // Subtree replan signal — surface to orchestrator (handled in main loop).
-  if (actor.outcome === 'plan_assumption_false') {
-    return { node: node.id, status: 'replan', reason: actor.replan_reason, actor }
+phase('Execute')
+while (pending.size) {
+  const ready = orderedIds.map(id => pending.get(id)).filter(Boolean).filter(node => isReady(node, pending))
+  if (!ready.length) {
+    return { status: 'invalid_plan', completed, pending: [...pending.keys()], reason: 'dependency deadlock' }
   }
 
-  // AC amendment (§6.1 anti-goal-erosion): the actor proposed an honest criterion change
-  // instead of quietly narrowing. The node proceeds through the normal gate (never selfClosed,
-  // so a fresh critic always fires) and the amendment is injected below as a recorded
-  // accepted-major — the Human's morning veto surface.
-  const _acAmendment = actor.outcome === 'ac_amendment_proposed'
-    ? (actor.ac_amendment || { ac_id: 'unspecified', as_written: '?', proposed: '?', why: actor.notes || 'no detail given' })
-    : null
+  const readOnlyBatch = ready.filter(node => node.parallelizable && node.write_set.length === 0)
+  const batch = readOnlyBatch.length ? readOnlyBatch : [ready[0]]
+  log(`Running mission nodes: ${batch.map(n => n.id).join(', ')}`)
 
-  // Micro-loop (§6.1 tier 1): retry failed V0/V1 self-closure up to cap.
-  let tries = 0
-  let _prevDigest = actor.closure_record && actor.closure_record.artifact_digest
-  while (actor.outcome === 'failed' && tries < capFor(node, 'micro_loop_retries')) {
-    tries++
-    const rModel = retryModel(aModel, tries)   // round up one tier per failed close (§3.6)
-    actor = await spawn(
-      `${actorPrompt(node)}\n\nPRIOR ATTEMPT FAILED: ${actor.notes || ''}. Retry (attempt ${tries + 1}).`,
-      { label: `actor:${node.id}:retry${tries}@${rModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: rModel },
-    )
-    if (!actor) return { node: node.id, status: 'lost', reason: 'actor died on retry' }
-    if (actor.outcome === 'plan_assumption_false')
-      return { node: node.id, status: 'replan', reason: actor.replan_reason, actor }
-    // Rung 0 (§6.1): a retry whose artifact identity did not change is iterating against a
-    // disconnected oracle (stale build / wrong path — the thumbnailbar failure class). Stop
-    // paying for the loop; the non-selfClosed R2 downgrade below still gates the node.
-    const _dg = actor.closure_record && actor.closure_record.artifact_digest
-    if (_dg && _prevDigest && _dg === _prevDigest) {
-      log(`Node ${node.id}: artifact_digest unchanged across retry ${tries} — disconnected oracle (§6.1 rung 0); micro-loop stopped.`)
-      actor.notes = `${actor.notes || ''} [rung-0: artifact_digest unchanged across retries — the check is not observing the change; verify build/path before iterating]`.trim()
-      break
+  const outputs = await parallel(batch.map(node => () =>
+    agent(actorPrompt(node), {
+      label: `node:${node.id}`,
+      phase: 'Execute',
+      schema: NODE_RESULT,
+    }).then(result => ({ node, result }))
+  ))
+
+  const accepted = []
+  for (let index = 0; index < outputs.length; index++) {
+    const output = outputs[index]
+    const node = batch[index]
+    if (!output) {
+      return { status: 'failed', blocked_node: node.id, reason: 'actor agent failed', completed }
     }
-    _prevDigest = _dg || _prevDigest
-  }
-
-  // Cold-improver + revision loop (§3.4 improver / §3.3 revision), scoped by mission class.
-  // Fresh independent eyes review the FIRST-DRAFT artifact; the actor revises with its own
-  // judgment. Positioned on fresh implementation drafts (NOT the final deliverable, which the
-  // gate panel + cold verifier already cover) — where cold review yields most. Quality lever,
-  // logged [model]; it lifts what enters the gate below, never replaces it. The loop can only
-  // improve or no-op — a botched/failed revision is discarded, so a node never regresses.
-  const eligibleForImprover = node.ac_required && !node.is_final_deliverable
-  const improverOn = eligibleForImprover && MCLASS !== 'M0' &&
-    (MCLASS === 'M2' ? node.improve_pass !== false : node.improve_pass === true)
-    // v0.4.2: no budget-pressure shedding — an overrun is marked, never traded against quality.
-  if (actor.outcome === 'done' && improverOn) {
-    // Improver is advisory and backstopped by the gate that follows it (§3.6) → Sonnet floor.
-    const improver = await spawn(improverPrompt(node, actor.artifact_summary),
-      { label: `improver:${node.id}@sonnet`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'sonnet' })
-    const suggestions = (improver && improver.findings) || []
-    if (suggestions.length > 0) {
-      // Revise re-runs the actor → same compute tier as the node's actor side.
-      const revised = await spawn(reviseActorPrompt(node, suggestions),
-        { label: `actor:${node.id}:revise@${aModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: aModel })
-      if (revised) {
-        if (revised.outcome === 'plan_assumption_false')
-          return { node: node.id, status: 'replan', reason: revised.replan_reason, actor: revised }
-        if (revised.outcome === 'done') actor = revised   // adopt only a clean revision; never regress
-        // 'failed' revision: discard, keep the original done first draft
+    const { result } = output
+    if (!result || result.outcome !== 'done') {
+      return {
+        status: result ? result.outcome : 'failed',
+        blocked_node: node.id,
+        result: result || null,
+        completed,
       }
     }
+
+    const expected = node.witness.kind === 'human-deferred' ? 'deferred' : 'passed'
+    if (result.witness.status !== expected) {
+      return {
+        status: 'witness_failed',
+        blocked_node: node.id,
+        expected_witness_status: expected,
+        result,
+        completed,
+      }
+    }
+
+    if (node.write_set.length > 0 && !result.commit_sha) {
+      return {
+        status: 'recovery_state_missing',
+        blocked_node: node.id,
+        reason: 'mutating node closed without a committed journal and witness',
+        result,
+        completed,
+      }
+    }
+    accepted.push({ node, result })
   }
 
-  // Close-time binding (§2.1): V0/V1 with no valid closure record ⇒ downgrade to V2.
-  const selfClosed = (node.v_class === 'V0' || node.v_class === 'V1') &&
-    actor.outcome === 'done' && actor.closure_record &&
-    actor.closure_record.exit_status === 0
-
-  // write_set conformance (§6.5): deterministic diff-vs-declaration check at close. In the
-  // serial-only era (constitution v0.3.7), a breach is logged to the defect ledger as a MINOR
-  // finding — advisory, not a gate. Until worktree fan-out for mutating nodes lands, the
-  // parallel-safety derivation the write_set protects is not load-bearing.
-  const breach = actor.outcome === 'done' ? writeSetBreach(node, actor) : null
-  if (breach) log(`· Node ${node.id}: ${breach.claim} — logged as minor (§6.5 advisory, serial-only era).`)
-
-  // Review gate at the node's effective R-tier (§3.1): the V→R floor binds, the planner may
-  // only raise. R0 already ran INSIDE the actor (two-phase prompt) and gates nothing — the
-  // closure record is the gate.
-  const tier = effectiveTier(node, selfClosed)
-  if (tier === 'R0') {
-    return { node: node.id, status: actor.outcome, actor, review_tier: tier,
-             closed_by: selfClosed ? 'check' : 'executor',
-             critic: breach ? { blockers: [], majors: [], minors: [breach] } : undefined,
-             check_source: selfClosed ? ((actor.closure_record && actor.closure_record.check_source) || 'ad-hoc') : null }
-  }
-
-  // R1: one spec-blind diff critic. R2: one cold-eye critic with a ≤5-read spot-check budget.
-  // R3: lens panel (trimmed to 2 — criteria-conformance duplicated correctness in practice on
-  // the first daylight mission, so the third agent bought ~no distinct findings).
-  const lenses = tier === 'R3' ? ['correctness', 'completeness'] : [null]
-  const findingSets = await parallel(lenses.map(lens => () =>
-    spawn(tier === 'R1' ? r1CriticPrompt(node, actor) : r2CriticPrompt(node, actor, lens),
-      // Gating critic — the model IS the gate, always Opus (§3.6).
-      { label: `critic:${node.id}:${tier}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
-
-  let verdict = adjudicate(findingSets, node)
-  if (breach) verdict.minors.push(breach)   // §6.5 advisory in serial-only era — logged, not gated
-
-  // ── Gate-fix loop (§6.1 tier 2): close the review→revise→re-review loop at the GATE ──────
-  // Additive, capped, and strictly non-regressing. While the gate verdict carries blockers OR
-  // majors, re-dispatch the actor with the current findings (reviseActorPrompt — the same
-  // machinery the improver loop uses), re-run THIS node's effective-tier critic, and
-  // re-adjudicate. The loop can only IMPROVE or NO-OP: a revision is adopted only when it is a
-  // clean `done` AND its fresh verdict is no worse (fewer-or-equal blockers, then majors); a
-  // failed / plan-assumption-false / empty / worse revision is DISCARDED and the prior actor +
-  // verdict stand. The write_set breach is a machine fact about whatever the actor last wrote,
-  // so it is recomputed per cycle on the adopted artifact. After the cap, surviving blockers
-  // still file to the human (unchanged), and surviving majors are accepted-with-reason below.
-  const _gateFixCap = capFor(node, 'gate_fix_cycles')
-  const _gfEntryBlockers = verdict.blockers.length, _gfEntryMajors = verdict.majors.length
-  let _fixCycles = 0, _gfAdopted = 0
-  while ((verdict.blockers.length > 0 || verdict.majors.length > 0) &&
-         _fixCycles < _gateFixCap) {   // v0.4.2: fix cycles run to their own cap; budget overrun never truncates the gate
-    _fixCycles++
-    const _priorFindings = [...verdict.blockers, ...verdict.majors, ...verdict.minors]
-    const revised = await spawn(reviseActorPrompt(node, _priorFindings),
-      { label: `actor:${node.id}:gatefix${_fixCycles}@${aModel}`, phase: 'Execute', schema: ACTOR_SCHEMA, model: aModel })
-    if (!revised || revised.outcome !== 'done') break   // failed/empty/plan-false revision ⇒ never regress
-    const _rBreach = writeSetBreach(node, revised)
-    const _rFindingSets = await parallel(lenses.map(lens => () =>
-      spawn(tier === 'R1' ? r1CriticPrompt(node, revised) : r2CriticPrompt(node, revised, lens),
-        { label: `critic:${node.id}:${tier}:gatefix${_fixCycles}${lens ? ':' + lens : ''}`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })))
-    const _rVerdict = adjudicate(_rFindingSets, node)
-    if (_rBreach) _rVerdict.minors.push(_rBreach)   // §6.5 advisory in serial-only era
-    // Adopt only on STRICT progress (lexicographic: fewer blockers, or same blockers + fewer
-    // majors). Equal or worse ⇒ keep the prior artifact and stop — the loop improves or no-ops,
-    // it never churns the artifact for a lateral trade.
-    const _better = _rVerdict.blockers.length < verdict.blockers.length ||
-      (_rVerdict.blockers.length === verdict.blockers.length && _rVerdict.majors.length < verdict.majors.length)
-    if (!_better) break                                 // no strict progress ⇒ keep prior, stop
-    actor = revised; verdict = _rVerdict; _gfAdopted++   // adopt the improved artifact + verdict (breach carried inside _rVerdict)
-    if (verdict.blockers.length === 0 && verdict.majors.length === 0) break  // fully clean ⇒ done
-  }
-  // (1b) Each surviving major is accepted-with-reason — extend the RESULT shape, not the gate.
-  // The reason is a written record of WHY the major stands at close: the gate-fix loop ran to its
-  // cap (or to budget exhaustion) and the finding persisted; the actor's own suggested_fix, if
-  // any, is carried so the human/AUDIT sees the unapplied remedy. The gate itself is unchanged.
-  const _majorAcceptReason = (f) =>
-    `accepted-with-reason: gate-fix loop ran ${_fixCycles}/${_gateFixCap} cycle(s)` +
-    ` and this major survived; ` +
-    `${f.suggested_fix ? `unapplied suggested_fix: ${f.suggested_fix}` : 'no actor-suggested fix on record'}.`
-  for (const _m of verdict.majors) {
-    if (_m.reason == null) _m.reason = _majorAcceptReason(_m)
-    // Deterministic AC-linkage flag (§6.1 anti-goal-erosion telemetry): an accepted major whose
-    // citation resolves to a named AC (not a §-clause) narrowed or contested a criterion — the
-    // signal §7 counts to see where goal erosion concentrates.
-    if (_m.cited_criterion && !/§/.test(String(_m.cited_criterion)) && _citationResolves(_m.cited_criterion, node))
-      _m.ac_related = true
-  }
-
-  // Gate-fix yield telemetry (§3.3 / §7). Snapshot HERE — before the cold reviewer below — so
-  // cold-caught findings never pollute the resolved counts. Emitted only when the loop was
-  // eligible (the gate carried findings at entry). `cycles - adopted` is the WASTE signal (cycles
-  // that paid full actor+critic cost then discarded on no strict progress); `terminal` says why it
-  // stopped. This is the record the deletion pattern (§0.2, evolve.md) reads to decide whether
-  // gate_fix_cycles pays rent or should be down-ratcheted.
-  const _gateFixTel = (_gfEntryBlockers + _gfEntryMajors > 0) ? {
-    cycles: _fixCycles,
-    adopted: _gfAdopted,
-    blockers_resolved: Math.max(0, _gfEntryBlockers - verdict.blockers.length),
-    majors_resolved: Math.max(0, _gfEntryMajors - verdict.majors.length),
-    terminal: (verdict.blockers.length === 0 && verdict.majors.length === 0) ? 'clean'
-      : _fixCycles >= _gateFixCap ? 'cap_exhausted'
-      : 'no_progress',
-  } : null
-
-  // AC amendment injection (§6.1 anti-goal-erosion): NOT gate-fixable (it is the honest record
-  // of a criterion change, not a defect a revision can clear), so it enters AFTER the fix loop
-  // and its telemetry snapshot: a recorded accepted-major carrying the structured amendment,
-  // landing in accepted_majors + the decision ledger for the Human's morning veto.
-  if (_acAmendment) {
-    verdict.majors.push({
-      severity: 'major',
-      claim: `AC amendment proposed: ${_acAmendment.ac_id} — "${_acAmendment.as_written}" -> "${_acAmendment.proposed}"`,
-      evidence: _acAmendment.why,
-      cited_criterion: _acAmendment.ac_id,
-      suggested_fix: null,
-      reason: 'accepted-with-reason: actor-proposed AC amendment, recorded for human review — never a quiet narrowing (§6.1)',
-      ac_related: true,
+  if (accepted.every(({ node }) => node.write_set.length === 0)) {
+    const records = accepted.map(({ node, result }) => ({ node_id: node.id, ...result }))
+    const checkpoint = await agent(checkpointPrompt(records), {
+      label: `checkpoint:${batch.map(node => node.id).join(',')}`,
+      phase: 'Execute',
+      schema: CHECKPOINT_RESULT,
     })
-  }
-
-  // Cold-reviewer rotation (§3.4), token-frugal. Detection is FREE (the boolean below, no
-  // model call). Fire ONE cold reviewer only to double-check a *clean* verdict on the final
-  // deliverable: a stale green is the only dangerous case, so a review that already found
-  // issues gets no cold pass, and routine nodes get none ever. Net cost ≤1 critic call/mission.
-  let coldConfirmed = false
-  const candidateClean = verdict.blockers.length === 0 && verdict.majors.length === 0
-  if (node.is_final_deliverable && candidateClean && capFor(node, 'cold_swaps') > 0) {
-    const cold = await spawn(coldCriticPrompt(node, actor.artifact_summary),
-      // Cold verifier on the final deliverable — a gate, always Opus (§3.6).
-      { label: `critic:${node.id}:cold`, phase: 'Execute', schema: CRITIC_SCHEMA, model: 'opus' })
-    coldConfirmed = true
-    if (cold) {
-      const c = adjudicate([cold], node)        // new findings ⇒ the green was stale
-      verdict.blockers.push(...c.blockers)
-      verdict.majors.push(...c.majors)
-      verdict.minors.push(...c.minors)
+    if (!checkpoint) {
+      return {
+        status: 'recovery_state_missing',
+        blocked_node: batch[0].id,
+        reason: 'read-only batch closed without a committed recovery checkpoint',
+        completed,
+      }
     }
+    for (const item of accepted) item.result = { ...item.result, commit_sha: checkpoint.commit_sha }
   }
 
-  return {
-    node: node.id, status: actor.outcome, actor,
-    closed_by: 'critic', critic: verdict, review_tier: tier,
-    cold_confirmed: coldConfirmed,
-    blocked: verdict.blockers.length > 0,
-    gate_fix: _gateFixTel,
-    ac_amendment: _acAmendment || undefined,
+  for (const { node, result } of accepted) {
+    completed[node.id] = result
+    pending.delete(node.id)
   }
 }
 
-// ── Main DAG walk: wave-based ready-set (correct for general DAG + dynamic replan) ──
-phase('Execute')
-log(`Mission ${plan.run_id} — ${plan.nodes.length} nodes, mode=${MODE}, class=${MCLASS}, constitution=${C}` +
-  (TOKEN_BUDGET || AGENT_BUDGET ? `, budget=${TOKEN_BUDGET || '∞'}tok/${AGENT_BUDGET || '∞'}agents` : ''))
-if (MCLASS !== _claimedClass)
-  log(`⚠ Mission class floored ${_claimedClass} → ${MCLASS} (§2.4 backstop): plan under-classified vs deterministic floor.`)
-const _mh = modelReport().actor_tier_histogram
-log(`Compute tiers (§3.6) — actors: ${Object.entries(_mh).map(([k, v]) => `${v}×${k}`).join(', ') || 'none'}; all gates Opus.`)
-
-const doneSet = new Set(Object.keys(completed))
-const results = { ...completed }
-let nodes = plan.nodes.slice()
-let replanBudget = (DEFAULT_CAPS.subtree_replans * 2) // mission-level ceiling (§6.2: 3/mission; kept conservative)
-let _overrunLogged = false
-
-while (doneSet.size < nodes.length) {
-  // Budget tripwire (§6.4 v0.4.2) at WAVE granularity: an overrun NEVER stops the walk — it is
-  // logged once here, recorded as a mission-level cap_hit, and marked in the final results.
-  if (budgetOverrun() && !_overrunLogged) {
-    _overrunLogged = true
-    log(`⚠ Mission budget estimate overrun (${tokensUsed()} output tok / ${_agentsSpawned} agents vs ` +
-      `estimate ${TOKEN_BUDGET || '∞'}/${AGENT_BUDGET || '∞'}) — run CONTINUES per §6.4 v0.4.2; ` +
-      `overrun marked in cap_hits + final report. ${nodes.length - doneSet.size} node(s) still to open.`)
-  }
-  const ready = nodes.filter(n => !doneSet.has(n.id) && isReady(n, doneSet))
-  if (ready.length === 0) {
-    log('No ready nodes and DAG incomplete — dependency deadlock or all-blocked. Finalizing (diverged).')
-    break
-  }
-  // Blast-radius parallelism (§6.5): a node fans out only when concurrency is provably safe.
-  //  - write_set: []  (declared read-only)  ⇒ no mutation, no race ⇒ fan out freely NOW.
-  //  - write_set: [g] (declared mutating)   ⇒ safe only as a write-set-DISJOINT subset, AND
-  //    only under worktree isolation + conflict-free integration merge — that mechanical wiring
-  //    is a documented follow-up (harness daylight test pending), so for now the disjoint subset
-  //    is COMPUTED and LOGGED but run serially (correct, just not yet concurrent).
-  //  - no write_set ⇒ conservative serial. A planner earns fan-out by declaring blast radius.
-  const declaresRO  = n => Array.isArray(n.write_set) && n.write_set.length === 0
-  const declaresMut = n => Array.isArray(n.write_set) && n.write_set.length > 0
-  const par = ready.filter(n => n.parallelizable && declaresRO(n))            // read-only ⇒ safe now
-  const seq = ready.filter(n => !(n.parallelizable && declaresRO(n)))         // everything else serial
-
-  // Surface the mutating nodes that ARE write-set-disjoint (would fan out once worktrees land).
-  const disjoint = []
-  for (const n of ready.filter(n => n.parallelizable && declaresMut(n)))
-    if (!disjoint.some(c => c.write_set.some(x => n.write_set.some(y => _globOverlap(x, y))))) disjoint.push(n)
-  if (disjoint.length > 1)
-    log(`Write-set-disjoint, safe to fan out (worktree+merge wiring pending): ${disjoint.map(n => n.id).join(', ')}`)
-
-  const waveResults = []
-  if (par.length) waveResults.push(...await parallel(par.map(n => () => runNode(n))))
-  for (const n of seq) waveResults.push(await runNode(n))
-
-  for (const r of waveResults.filter(Boolean)) {
-    if (r.status === 'replan' && replanBudget > 0) {
-      // Subtree replan (§6.1 tier 3): record the surprise; a fuller adapter would
-      // re-plan the subtree here. v0.1 marks the node done-with-defect and continues,
-      // surfacing the replan reason to AUDIT rather than silently looping.
-      replanBudget--
-      log(`Node ${r.node}: plan assumption false — ${r.reason}. Replan budget left: ${replanBudget}.`)
-    }
-    results[r.node] = r
-    doneSet.add(r.node)
-  }
-}
-
-// ── Audit (§6) — depth scales with mission class (§2.4) ──────────────────────
 phase('Audit')
-const blockers = Object.values(results).flatMap(r => (r.critic && r.critic.blockers) || [])
-const majors = Object.values(results).flatMap(r => (r.critic && r.critic.majors) || [])
-const replans = Object.values(results).filter(r => r.status === 'replan')
-// Planned-vs-actual for the run-record (§7) — the telemetry that calibrates class defaults.
-function budgetReport() {
-  // Any ceiling overrun MUST surface as a machine-readable cap_hit (schema v0.2 enum:
-  // token_budget / agent_budget, node sentinel "mission") — prose-only breaches are
-  // invisible to the §7 calibration corpus. would_have_converged is AUDIT's judgment.
-  const cap_hits = []
-  if (AGENT_BUDGET != null && _agentsSpawned > AGENT_BUDGET)
-    cap_hits.push({ node: 'mission', cap: 'agent_budget', limit: AGENT_BUDGET, used: _agentsSpawned, would_have_converged: null })
-  if (TOKEN_BUDGET != null && tokensUsed() > TOKEN_BUDGET)
-    cap_hits.push({ node: 'mission', cap: 'token_budget', limit: TOKEN_BUDGET, used: tokensUsed(), would_have_converged: null })
+const audit = await agent(`You are the fresh read-only auditor for an integrated mission.
+
+MISSION: ${plan.goal}
+REPOSITORY: ${plan.repo}
+BRANCH: ${plan.branch}
+MISSION ACCEPTANCE CRITERIA: ${JSON.stringify(plan.acceptance_criteria)}
+BOUNDARIES: ${JSON.stringify(plan.boundaries || [])}
+NODE RESULTS: ${JSON.stringify(completed)}
+
+Read ~/.claude/docs/operating-card.md. Inspect the actual integrated artifact and rerun the relevant witnesses where feasible. A green check closes only the property it observes. Return failed when any non-deferred finding survives, human_required only when there are no findings and the remaining criteria are explicitly human-deferred, and passed only when every criterion has evidence with nothing deferred. Do not edit files.`, {
+  label: 'mission:audit',
+  phase: 'Audit',
+  schema: AUDIT_RESULT,
+})
+
+if (!audit) {
   return {
-    token_budget: TOKEN_BUDGET, agent_budget: AGENT_BUDGET,
-    tokens_spent: tokensUsed(), agents_spawned: _agentsSpawned,
-    exhausted: budgetOverrun(),        // estimate crossed — informational, never a halt (v0.4.2)
-    overrun: budgetOverrun(),          // explicit v0.4.2 marker: run continued past the estimate
-    overrun_policy: 'continue-and-mark (§6.4 v0.4.2)',
-    cap_hits,
-    unopened_nodes: nodes.filter(n => !doneSet.has(n.id)).map(n => n.id),
+    status: 'failed',
+    completed,
+    audit: null,
+    reason: 'final audit agent failed',
   }
 }
 
-// M0 (errand): no separate audit agent. A node's own close-time check (§2.1) IS the audit;
-// re-running one just-passed check from a fresh agent buys nothing. Verdict is deterministic.
-if (MCLASS === 'M0') {
-  const failed = Object.values(results).some(r => r.status === 'failed' || r.status === 'lost')
-  const ledger = Object.values(results)
-    .flatMap(r => (r.critic ? [...r.critic.majors, ...r.critic.minors] : []))
-    .map(f => f.claim || String(f))
-  log(`M0 errand — skipping separate AUDIT agent; verdict from deterministic node state.`)
+const auditConsistent =
+  (audit.status === 'passed' && audit.findings.length === 0 && audit.human_deferred.length === 0) ||
+  (audit.status === 'failed' && audit.findings.length > 0) ||
+  (audit.status === 'human_required' && audit.findings.length === 0 && audit.human_deferred.length > 0)
+if (!auditConsistent) {
   return {
-    run_id: plan.run_id,
-    mission_class: MCLASS,
-    verdict: (blockers.length === 0 && !failed) ? 'DELIVERED' : 'DIVERGED',
-    diverged_reason: (blockers.length === 0 && !failed) ? null : 'node_failure',
-    unresolved_blockers: blockers,
-    accepted_majors: majors,
-    replans: replans.map(r => ({ node: r.node, reason: r.reason })),
-    punchlist: [],
-    ledger,
-    budget: budgetReport(),
-    compute_tiers: modelReport(),
-    node_results: results,
+    status: 'failed',
+    completed,
+    audit,
+    reason: 'final audit result contradicts its evidence',
   }
 }
-
-// M1 samples the rechecks; M2 re-runs every recorded check (§2.4). Ad-hoc-check self-closures
-// (no verifier-registry backing) are never left to sampling luck — check-adequacy there is a
-// hidden judgment inside the V0/V1 tier, so the audit always judges it (ex-audit 2026-06-12).
-const _adHoc = Object.values(results)
-  .filter(r => r.closed_by === 'check' && (r.check_source || 'ad-hoc') !== 'registry')
-  .map(r => r.node)
-const _adHocClause = _adHoc.length
-  ? ` ALWAYS include these ad-hoc-check self-closures in the judge-sample (their check was composed by the actor, not named in the repo contract — judge the CHECK'S ADEQUACY, not just its exit status): ${JSON.stringify(_adHoc)}.`
-  : ''
-const recheckInstruction = (MCLASS === 'M2'
-  ? 'Re-run ALL recorded closure checks and judge-sample 2-3 self-closures for sufficiency (§2.1).'
-  : 'SAMPLE the rechecks: re-run 2-3 recorded closure checks and judge-sample 2-3 self-closures for sufficiency (§2.1).') + _adHocClause
-
-const auditSummary = Object.values(results).map(r =>
-  `[${r.node}] status=${r.status} closed_by=${r.closed_by || '-'}` +
-  `${r.critic ? ` blockers=${r.critic.blockers.length} majors=${r.critic.majors.length}` : ''}`).join('\n')
-
-const audit = await spawn(`${govern}
-
-AUDIT PHASE for mission ${plan.run_id} (class ${MCLASS}), goal: ${plan.goal}.
-Per-node execution results:
-${auditSummary}
-
-Unresolved blockers (human-only to waive): ${JSON.stringify(blockers)}
-Open majors (agent accept-with-reason allowed): ${JSON.stringify(majors)}
-Plan-assumption-false nodes: ${JSON.stringify(replans.map(r => ({ node: r.node, reason: r.reason })))}
-${budgetOverrun() ? `BUDGET ESTIMATE OVERRUN (§6.4 v0.4.2): the run spent ${tokensUsed()} output tokens / ${_agentsSpawned} agents against the estimate ${TOKEN_BUDGET || 'none'}/${AGENT_BUDGET || 'none'} and CONTINUED per policy. This is NOT a divergence and must NOT drive the verdict — but the overrun MUST be marked prominently in the ledger and report (planned-vs-actual + one decision-ledger line).` : ''}
-
-${recheckInstruction} Assemble the punchlist (each item is a candidate new node) and the
-defect ledger (majors accepted-with-reason + minors + unreached criteria). Verdict DELIVERED
-unless the mission diverged (§6.3) or an unwaived blocker remains.`,
-  // AUDIT judges the whole mission — always Opus (§3.6).
-  { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA, model: 'opus' })
 
 return {
-  run_id: plan.run_id,
-  mission_class: MCLASS,
-  verdict: audit ? audit.verdict : 'DIVERGED',
-  diverged_reason: audit ? (audit.verdict === 'DIVERGED' ? 'no_progress_or_blockers' : null) : 'audit_lost',
-  unresolved_blockers: blockers,            // human-only; drive the "Needs you" report section
-  accepted_majors: majors,
-  replans: replans.map(r => ({ node: r.node, reason: r.reason })),
-  punchlist: audit ? audit.punchlist : [],
-  ledger: audit ? audit.ledger : [],
-  budget: budgetReport(),
-  compute_tiers: modelReport(),
-  node_results: results,
+  status: audit.status,
+  completed,
+  audit,
 }
