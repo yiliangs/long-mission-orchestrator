@@ -9,7 +9,7 @@ $ARGUMENTS
 
 Run a recoverable sequence of bounded mission cycles over one living artifact. Each cycle must produce a distinct verified result, not more discussion about the same result.
 
-Load `~/.claude/docs/agent-constitution.md` and `<repo>/.mission/contract.md` before starting or resuming. Apply the same missing-contract gate as `/mission`.
+Apply `/mission`'s LOAD behavior before starting or resuming: load the constitution and fieldnotes, instantiate a missing `<repo>/.mission/contract.md` from `~/.claude/docs/mission-contract-default.md` without asking, specialize it only with established repository facts, then load it.
 
 For a new loop:
 

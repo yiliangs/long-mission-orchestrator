@@ -10,7 +10,7 @@ The system scales absence, not certainty. It freezes a small task graph, delegat
 
 The mission sequence is:
 
-1. **LOAD:** load the compact constitution and repository contract.
+1. **LOAD:** load the compact constitution and repository contract, creating a conservative default contract when one is absent.
 2. **GRILL:** resolve consequential ambiguity and define done.
 3. **PLAN:** build the smallest sufficient DAG and design claim-observing witnesses.
 4. **FIGHT:** challenge non-trivial plans with fresh, evidence-bound critics.
@@ -40,8 +40,11 @@ A green check proves only what it can observe. Compilation does not prove live b
 | `schema/mission-plan.schema.json` | frozen plan representation |
 | `executors/mission-executor.workflow.js` | DAG execution and the canonical integrated audit |
 | `docs/operating-card.md` | actor and auditor conduct |
+| `docs/mission-contract-default.md` | conservative contract created when a target repository has none |
 | `scripts/mission_heartbeat.ps1` | interrupted-run recovery |
 | `.mission/contract.md` | repository-specific checks, critical paths, boundaries, and resources |
+
+The constitution is normative and cross-repository. A mission contract is descriptive and repository-specific: executable checks, concrete risk surfaces, observation gaps, environment constraints, and available resources. It does not repeat constitutional authority or lifecycle procedure.
 
 The mission contract has a fixed location and is loaded only by mission tooling. It does not occupy the repository's automatically loaded `CLAUDE.md` context.
 
@@ -57,6 +60,7 @@ long-mission-orchestrator/
 |-- docs/
 |   |-- agent-constitution.md
 |   |-- operating-card.md
+|   |-- mission-contract-default.md
 |   `-- archive/agent-constitution-v0.5.1.md
 |-- skills/
 |   |-- mission.md
@@ -79,7 +83,7 @@ This repository is the source of truth. `~/.claude` contains deployed copies onl
 powershell.exe -ExecutionPolicy Bypass -File scripts\deploy.ps1
 ```
 
-Deployment installs the version marker, active constitution, operating card, plan schema, three commands, workflow executor, heartbeat, hidden-task helper, and validator. Repository contracts are never deployed globally; each target repository owns `.mission/contract.md`. Deployment removes files from the retired V/R/M, evolution, record, and mailbox systems.
+Deployment installs the version marker, active constitution, operating card, default contract, plan schema, three commands, workflow executor, heartbeat, hidden-task helper, and validator. The default is deployed globally as a source template; each target repository owns the instantiated `.mission/contract.md`. Deployment removes files from the retired V/R/M, evolution, record, and mailbox systems.
 
 ## Verify
 
