@@ -2,6 +2,11 @@
 
 Notable changes to long-mission-orchestrator. Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Changed
+- A missing repository mission contract is now instantiated automatically from a deployed baseline, then specialized only with directly evidenced checks, risk surfaces, observation gaps, boundaries, and resource facts.
+
 ## [1.0.0] - 2026-07-24
 
 Breaking simplification of the active mission runtime.

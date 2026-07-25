@@ -31,6 +31,7 @@ New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$
 Copy-Verified "$repo\VERSION" "$claude\docs\lmo-version.txt"
 Copy-Verified "$repo\docs\agent-constitution.md" "$claude\docs\agent-constitution.md"
 Copy-Verified "$repo\docs\operating-card.md" "$claude\docs\operating-card.md"
+Copy-Verified "$repo\docs\mission-contract-default.md" "$claude\docs\mission-contract-default.md"
 Copy-Verified "$repo\schema\mission-plan.schema.json" "$claude\docs\mission-plan.schema.json"
 
 Copy-Verified "$repo\skills\mission.md" "$claude\commands\mission.md"
@@ -62,7 +63,7 @@ foreach ($path in $obsolete) {
 }
 
 Write-Host "Deployed long-mission-orchestrator $version -> $claude"
-Write-Host "  authority   agent constitution; contracts stay in target repos"
+Write-Host "  authority   agent constitution; default contract seed for target repos"
 Write-Host "  commands    /mission /mission-loop /mission-log-audit"
 Write-Host "  runtime     plan schema + workflow executor + heartbeat"
 Write-Host "  verified    every deployed file matches its canonical source"

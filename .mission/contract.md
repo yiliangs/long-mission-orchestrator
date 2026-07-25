@@ -13,8 +13,6 @@ This repository is eligible for `/mission`.
 
 ## Critical paths
 
-Changes to these paths require direct witnesses and complete-diff inspection:
-
 - `VERSION`
 - `docs/agent-constitution.md`
 - `docs/operating-card.md`
@@ -34,4 +32,4 @@ Changes to these paths require direct witnesses and complete-diff inspection:
 
 - The active unattended-recovery runtime requires Windows and Windows PowerShell 5.1.
 - Local execution is the default.
-- This contract does not authorize remote execution or third-party publication.
+- The active runtime provides no remote executor or publication adapter.

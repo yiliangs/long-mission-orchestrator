@@ -9,7 +9,7 @@ $ARGUMENTS
 
 Turn the goal into a verified deliverable through LOAD, GRILL, PLAN, FIGHT, FREEZE, RECOVER, EXECUTE, AUDIT, and DELIVER.
 
-0. **LOAD.** Read `~/.claude/docs/agent-constitution.md`, `<repo>/.mission/contract.md`, and the project's fieldnotes card when present. The contract supplies repository-specific checks, critical paths, machine-blind properties, boundaries, and resource restrictions. If it is absent, inspect the repository and offer to draft it for approval; do not run the mission without it.
+0. **LOAD.** Read `~/.claude/docs/agent-constitution.md` and the project's fieldnotes card when present. If `<repo>/.mission/contract.md` is absent, instantiate it from `~/.claude/docs/mission-contract-default.md` without asking. On every load, inspect tracked architecture, CI, build, test, dependency, deployment, and validation files. Record exact runnable checks, concrete critical paths, blind spots, boundaries, and resource facts only with a named basis; leave unsupported facts unknown and remove entries whose basis is stale. Do not restate constitutional authority or lifecycle procedure in the contract. Then load it as the repository's factual operating map.
 
 For a new mission:
 
