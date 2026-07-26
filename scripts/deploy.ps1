@@ -26,13 +26,16 @@ function Copy-Verified([string]$Source, [string]$Destination) {
     }
 }
 
-New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$claude\workflows", "$claude\scripts" | Out-Null
+New-Item -ItemType Directory -Force -Path "$claude\docs", "$claude\commands", "$claude\workflows", "$claude\scripts", "$claude\channel\apps.d" | Out-Null
 
 Copy-Verified "$repo\VERSION" "$claude\docs\lmo-version.txt"
 Copy-Verified "$repo\docs\agent-constitution.md" "$claude\docs\agent-constitution.md"
 Copy-Verified "$repo\docs\operating-card.md" "$claude\docs\operating-card.md"
 Copy-Verified "$repo\docs\mission-contract-default.md" "$claude\docs\mission-contract-default.md"
 Copy-Verified "$repo\schema\mission-plan.schema.json" "$claude\docs\mission-plan.schema.json"
+Copy-Verified "$repo\schema\mission-audit.schema.json" "$claude\docs\mission-audit.schema.json"
+Copy-Verified "$repo\schema\mission-repair.schema.json" "$claude\docs\mission-repair.schema.json"
+Copy-Verified "$repo\schema\mission-result.schema.json" "$claude\docs\mission-result.schema.json"
 
 Copy-Verified "$repo\skills\mission.md" "$claude\commands\mission.md"
 Copy-Verified "$repo\skills\mission-loop.md" "$claude\commands\mission-loop.md"
@@ -43,6 +46,9 @@ Copy-Verified "$repo\executors\mission-executor.workflow.js" "$claude\workflows\
 Copy-Verified "$repo\scripts\mission_heartbeat.ps1" "$claude\scripts\mission_heartbeat.ps1"
 Copy-Verified "$repo\scripts\run_hidden.vbs" "$claude\scripts\run_hidden.vbs"
 Copy-Verified "$repo\scripts\validate_record.py" "$claude\scripts\validate_record.py"
+Copy-Verified "$repo\scripts\validate_terminal.py" "$claude\scripts\validate_terminal.py"
+Copy-Verified "$repo\scripts\mission_notify.py" "$claude\scripts\mission_notify.py"
+Copy-Verified "$repo\channel\lmo.json" "$claude\channel\apps.d\lmo.json"
 
 $obsolete = @(
     "$claude\docs\mission-governance.md",
@@ -55,8 +61,7 @@ $obsolete = @(
     "$claude\scripts\classify-mission.js",
     "$claude\scripts\diff_overlap.py",
     "$claude\scripts\mission_mailbox.py",
-    "$claude\scripts\md2html.py",
-    "$claude\channel\apps.d\lmo.json"
+    "$claude\scripts\md2html.py"
 )
 foreach ($path in $obsolete) {
     Remove-Item -LiteralPath $path -ErrorAction SilentlyContinue
@@ -65,6 +70,7 @@ foreach ($path in $obsolete) {
 Write-Host "Deployed long-mission-orchestrator $version -> $claude"
 Write-Host "  authority   agent constitution; default contract seed for target repos"
 Write-Host "  commands    /mission /mission-loop /mission-log-audit"
-Write-Host "  runtime     plan schema + workflow executor + heartbeat"
+Write-Host "  runtime     plan/audit/result schemas + executor + heartbeat"
+Write-Host "  reporting   outbound terminal email through shared Claude Channel"
 Write-Host "  verified    every deployed file matches its canonical source"
-Write-Host "  removed     legacy V/R/M, evolution, record, and mailbox surfaces"
+Write-Host "  removed     legacy V/R/M, evolution, record, and inbound mailbox surfaces"

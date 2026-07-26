@@ -28,6 +28,18 @@
     "repo": { "type": "string", "minLength": 1 },
     "mode": { "enum": ["attended", "unattended"] },
     "branch": { "type": "string", "pattern": "^agent/(mission|loop)-" },
+    "governance": {
+      "type": "object",
+      "required": ["runtime_version", "constitution_sha256", "contract_sha256", "executor_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "runtime_version": { "type": "string", "minLength": 1 },
+        "constitution_sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "contract_sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "executor_sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+      },
+      "description": "The deployed runtime and governing inputs loaded before the plan froze. Optional only so already-frozen 1.0 plans remain resumable."
+    },
     "boundaries": {
       "type": "array",
       "items": { "type": "string" }
@@ -84,8 +96,8 @@
           "properties": {
             "claim": { "type": "string", "minLength": 1 },
             "kind": {
-              "enum": ["machine", "measured", "human-deferred"],
-              "description": "machine: a deterministic check observes the claim; measured: instrumentation observes it; human-deferred: only the human can close it."
+              "enum": ["machine", "measured", "reviewed", "human-deferred"],
+              "description": "machine: a deterministic check observes the claim; measured: instrumentation observes it; reviewed: a fresh artifact-only critic must independently close the judgment-bearing claim; human-deferred: only the human can close it."
             },
             "method": { "type": "string", "minLength": 1 }
           }

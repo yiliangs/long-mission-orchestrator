@@ -8,6 +8,7 @@ This repository is eligible for `/mission`.
 |---|---|
 | Workflow executor parses | `node --check executors/mission-executor.workflow.js` |
 | JSON document conforms to an LMO schema | `python scripts/validate_record.py <schema.json> <document.json>` |
+| Terminal notification and schema behavior pass | `python -m unittest discover -s tests -v` |
 | Heartbeat parses under Windows PowerShell 5.1 | `powershell.exe -NoProfile -Command '$errors=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "scripts/mission_heartbeat.ps1"), [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors; exit 1 }'` |
 | Operative files deploy byte-identically | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\deploy.ps1` |
 
@@ -17,14 +18,18 @@ This repository is eligible for `/mission`.
 - `docs/agent-constitution.md`
 - `docs/operating-card.md`
 - `skills/mission*.md`
-- `schema/mission-plan.schema.json`
+- `schema/mission-*.schema.json`
 - `executors/mission-executor.workflow.js`
 - `scripts/mission_heartbeat.ps1`
+- `scripts/mission_notify.py`
+- `scripts/validate_terminal.py`
+- `channel/lmo.json`
 - `scripts/deploy.ps1`
 
 ## Machine-blind properties
 
-- Parse checks do not prove DAG execution, witness enforcement, or resume behavior.
+- Parse checks do not prove DAG execution, reviewed-witness independence, bounded repair, or resume behavior.
+- Unit tests do not prove live shared-channel delivery.
 - PowerShell parsing does not prove scheduled-task recovery or self-disarm behavior.
 - Schema validity does not prove that a witness can observe its claim.
 
