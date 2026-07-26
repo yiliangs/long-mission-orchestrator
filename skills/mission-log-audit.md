@@ -13,8 +13,10 @@ Inspect the requested run or, with no argument, recent `.mission/*/plan.json`, j
 
 Look for:
 
-- a run with no `REPORT.md`, no active driver, and incomplete journal tasks;
-- a heartbeat that is dead, repeatedly resuming without progress, or still armed after delivery;
+- a run with no valid `result.json`, no active driver, and incomplete journal tasks;
+- a latest canonical `audit.json` that is missing, uncommitted, older than the audited branch, or inconsistent with `result.json`;
+- a terminal result with missing, ambiguous, or unreconciled `notification.json`;
+- a heartbeat that is dead, repeatedly resuming without progress, or still armed after any terminal result;
 - a paused loop whose contact leash, charter boundary, or budget requires a decision;
 - acceptance criteria without an observable passing witness;
 - reported assumptions, blockers, or plan premises awaiting human reopening;

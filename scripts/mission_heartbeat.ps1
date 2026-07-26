@@ -1,10 +1,10 @@
 # LMO mission heartbeat: orchestrator-armed recovery from committed mission state.
 #
 # A crash, reboot, or usage-window boundary must not erase a mission. The orchestrator arms a
-# per-run scheduled task after freeze and disarms it at delivery. Each beat is idempotent:
+# per-run scheduled task after freeze and disarms it at a persisted terminal result. Each beat is idempotent:
 #   active run             -> exit
-#   interrupted run        -> resume from committed plan, journal, witnesses, and branch state
-#   complete or absent run -> verify task deletion, then exit
+#   interrupted run        -> resume from committed plan, audits, journal, witnesses, and branch state
+#   terminal or absent run -> verify task deletion, then exit
 #   heartbeat.dead present -> quiet re-disarm; escalate the same failure only once
 #
 #   arm:     powershell.exe -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 arm    -RunDir <repo>\.mission\<run-id>
@@ -213,17 +213,26 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File mission_heartbeat.ps1 be
             exit 0
         }
 
-        # Complete marker -> disarm + exit (DELIVER leaves REPORT.md; disarm belongs to DELIVER
-        # but the beat self-disarms as a backstop). Verified: only a PROVEN deletion writes the
-        # heartbeat.disarmed marker; a failed delete keeps the lock so the next beat retries.
-        if (Test-Path (Join-Path $cfg.run_dir 'REPORT.md')) {
-            $ok = Disarm-Task $taskName $wrapperPath
-            Log "BEAT  $runId  REPORT.md present -> mission delivered -> self-disarm $(if ($ok) {'verified'} else {'FAILED - task still registered; retrying next beat'})"
-            if ($ok) {
-                Get-Date -Format 'o' | Set-Content -Path (Join-Path $cfg.run_dir 'heartbeat.disarmed') -Encoding ASCII
-                Remove-Item $Lock -ErrorAction SilentlyContinue
+        # Terminal marker -> validate the complete committed terminal state before disarming.
+        # REPORT.md may describe failure; result.json is terminal only when its schema, canonical
+        # audit, success marker, and committed files agree. A failed delete keeps the lock so the
+        # next beat retries.
+        $resultPath = Join-Path $cfg.run_dir 'result.json'
+        if (Test-Path $resultPath) {
+            $validator = Join-Path $ScriptsDir 'validate_terminal.py'
+            & python $validator $cfg.run_dir *> $null
+            if ($LASTEXITCODE -eq 0) {
+                $terminal = Get-Content $resultPath -Raw | ConvertFrom-Json
+                $terminalStatus = [string]$terminal.status
+                $ok = Disarm-Task $taskName $wrapperPath
+                Log "BEAT  $runId  valid terminal result=$terminalStatus -> self-disarm $(if ($ok) {'verified'} else {'FAILED - task still registered; retrying next beat'})"
+                if ($ok) {
+                    Get-Date -Format 'o' | Set-Content -Path (Join-Path $cfg.run_dir 'heartbeat.disarmed') -Encoding ASCII
+                    Remove-Item $Lock -ErrorAction SilentlyContinue
+                }
+                exit 0
             }
-            exit 0
+            Log "BEAT  $runId  result.json present but terminal validation failed -> recovery remains armed"
         }
 
         # The driver that armed recovery owns the run while its exact process instance lives.

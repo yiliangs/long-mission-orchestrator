@@ -4,8 +4,23 @@ Notable changes to long-mission-orchestrator. Format follows [Keep a Changelog](
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-07-26
+
+### Added
+- Persist every canonical audit as an immutable numbered record plus the latest `audit.json`, stamped with cumulative repair count, audited commit, runtime version, and constitution, contract, and executor digests.
+- Persist an in-flight repair checkpoint so crash recovery cannot reset or bypass the two-repair ceiling.
+- Persist `result.json` and `REPORT.md` for passed, failed, and human-required terminal outcomes; only `mission.success` denotes a pass.
+- Restore one run-scoped, cross-process-locked outbound terminal email through the shared Claude Channel, with prepared and ambiguous states that refuse automatic replay even if report bytes later change.
+- Add the `reviewed` witness kind, which requires a fresh artifact-only critic and committed review evidence.
+
 ### Changed
-- A missing repository mission contract is now instantiated automatically from a deployed baseline, then specialized only with directly evidenced checks, risk surfaces, observation gaps, boundaries, and resource facts.
+- The canonical executor repairs failed integrated audits at most twice, reruns a fresh audit after each repair, then terminalizes without silent continuation.
+- Heartbeat recovery disarms on any valid terminal `result.json` rather than treating `REPORT.md` as a success marker.
+- New plans stamp loaded governance digests, while already-frozen schema 1.0 plans remain resumable.
+- A missing repository mission contract is instantiated automatically from a deployed baseline, then specialized only with directly evidenced checks, risk surfaces, observation gaps, boundaries, and resource facts.
+
+### Removed
+- Terminal silence as an outcome. Failed and human-required missions now leave the same durable human-facing surface as successful missions.
 
 ## [1.0.0] - 2026-07-24
 

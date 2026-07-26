@@ -23,12 +23,12 @@ For a new loop:
 
    Individual cycles do not arm their own heartbeat. Commit state after every cycle so a resumed driver can reconstruct the frontier. Foreground operation may use `/loop /mission-loop --resume <loop-id>` for one persisted cycle per wake.
 
-4. **CYCLE.** Derive one bounded mission brief from the charter, current state, and latest steering. Build its plan with the canonical mission schema and run it through the canonical mission executor, with cycle-level heartbeat arming suppressed. Run FIGHT when warranted, FREEZE, EXECUTE, and AUDIT without reopening the human grill. Retain a result only when its claim-observing witness passes.
+4. **CYCLE.** Derive one bounded mission brief from the charter, current state, and latest steering. Build its plan with the canonical mission schema and run it through the canonical mission executor with `args: { plan, completed: {}, terminal: { notify: false, disarm: false } }`. Individual cycles persist their audits and results but neither email nor disarm the loop-level heartbeat. Run FIGHT when warranted, FREEZE, EXECUTE, and AUDIT without reopening the human grill. Retain a result only when its claim-observing witness passes.
 
    Breadth and mania maintain a spectrum map: name the real axes revealed by the alternatives, place each retained branch, and mark uncovered regions. Depth compares every candidate with the current champion against the charter's direction and cumulative drift, not only the previous commit.
 
 5. **STEER.** After each cycle, report only the verified change, current champion or frontier, spectrum gaps where applicable, cumulative drift, and remaining budget. Apply user steering at the next boundary. In unattended mode, pause when the contact leash expires; silence never authorizes a direction change, merge, publication, or destructive action.
 
-Stop at the cycle or token ceiling, two consecutive cycles with no verified improvement or distinct alternative, a charter boundary, contact-leash expiry, or an explicit stop. Per-cycle reports must not be named `REPORT.md`; reserve `.mission/loop-<slug>/REPORT.md` for finalization so the heartbeat disarms only when the loop ends.
+Stop at the cycle or token ceiling, two consecutive cycles with no verified improvement or distinct alternative, a charter boundary, contact-leash expiry, or an explicit stop. At loop finalization, write the loop-level `result.json` and `REPORT.md`, send one terminal email, and disarm the loop heartbeat. Per-cycle terminal files remain inside their own run directories and cannot disarm the loop.
 
 For `--resume <loop-id>`, load the charter, plan, journal, branches, and evidence; confirm no live driver; reconstruct the champion or frontier from committed state; and continue at the next cycle boundary without re-running the meta-grill.

@@ -7,7 +7,7 @@ The constitution defines what must remain true. Commands and runtime files defin
 
 ## 1. Human authority
 
-Agents never merge to the default branch, force-push, rewrite published history, tag, release, or waive a blocker or deferred criterion. Pushes, draft pull requests, and external side effects require authorization. The human merges, publishes, and waives blockers.
+Agents never merge to the default branch, force-push, rewrite published history, tag, release, or waive a blocker or deferred criterion. Pushes, draft pull requests, and external side effects require authorization. Invoking `/mission` authorizes exactly one configured terminal report email for that run; it authorizes no other external communication. The human merges, publishes, and waives blockers.
 
 An external side effect used as verification, including a live mutation, requires explicit case-specific human intervention naming the target. It must be confined to a controlled test environment, minimize blast radius, keep an auditable record, and have a cleanup path. Authorization does not generalize to another target or later run.
 
@@ -23,8 +23,8 @@ Every completion claim requires evidence that exercises the property claimed. Co
 
 ## 4. Recoverability
 
-Keep one active driver per run. Load-bearing state must live in committed artifacts sufficient to reconstruct the mission without transcript memory. Recovery resumes only incomplete work and preserves the frozen goal.
+Keep one active driver per run. Load-bearing state, including every canonical audit and the terminal result, must live in committed artifacts sufficient to reconstruct the mission without transcript memory. Recovery resumes only incomplete work and preserves the frozen goal.
 
 ## 5. Truthful closure
 
-A mission is complete only when every non-deferred acceptance criterion has claim-observing evidence, remaining human work is explicit, and failures are reported without disguise.
+A mission terminates only with a persisted result and human-readable report. It passes only when every non-deferred acceptance criterion has claim-observing evidence; failed and human-required outcomes remain explicit terminal states, never silence or simulated success.

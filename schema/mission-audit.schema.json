@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yiliang.local/mission-audit.schema.json",
+  "title": "Persisted mission audit",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "sequence",
+    "repair_cycles",
+    "audited_commit",
+    "runtime_version",
+    "governance",
+    "audit"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "repair_cycles": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "audited_commit": { "type": "string", "pattern": "^[0-9a-fA-F]{7,64}$" },
+    "runtime_version": { "type": "string", "minLength": 1 },
+    "governance": {
+      "type": "object",
+      "required": ["constitution_sha256", "contract_sha256", "executor_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "constitution_sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "contract_sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+        "executor_sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" }
+      }
+    },
+    "audit": { "$ref": "#/$defs/audit" }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["locus", "criterion", "evidence", "consequence", "recommendation"],
+      "additionalProperties": false,
+      "properties": {
+        "locus": { "type": "string" },
+        "criterion": { "type": "string" },
+        "evidence": { "type": "string" },
+        "consequence": { "type": "string" },
+        "recommendation": { "type": "string" }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "required": ["status", "findings", "human_deferred", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["passed", "failed", "human_required"] },
+        "findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "human_deferred": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "summary": { "type": "string" }
+      }
+    }
+  }
+}

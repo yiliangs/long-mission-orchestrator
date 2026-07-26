@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yiliang.local/mission-result.schema.json",
+  "title": "Terminal mission result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "success",
+    "audit_sequence",
+    "audited_commit",
+    "audit_file",
+    "repair_cycles",
+    "findings",
+    "human_deferred",
+    "summary",
+    "terminal_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["passed", "failed", "human_required"] },
+    "success": { "type": "boolean" },
+    "audit_sequence": { "type": "integer", "minimum": 1 },
+    "audited_commit": { "type": "string", "pattern": "^[0-9a-fA-F]{7,64}$" },
+    "audit_file": { "type": "string", "minLength": 1 },
+    "repair_cycles": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "human_deferred": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "summary": { "type": "string" },
+    "terminal_at": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["locus", "criterion", "evidence", "consequence", "recommendation"],
+      "additionalProperties": false,
+      "properties": {
+        "locus": { "type": "string" },
+        "criterion": { "type": "string" },
+        "evidence": { "type": "string" },
+        "consequence": { "type": "string" },
+        "recommendation": { "type": "string" }
+      }
+    }
+  }
+}
